@@ -1,0 +1,170 @@
+import type { AIProviderRegistry } from '../ai/registry';
+import { generate } from '../ai/generate';
+import { CodeReviewResultSchema, type CodeReviewResult } from './schema';
+import { buildSystemPrompt, buildUserPrompt, type ReviewContext } from './prompts';
+import type { ParsedFile } from '../gitlab/review-files';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('code-analyzer');
+
+export interface AnalyzeOptions {
+  files: ParsedFile[];
+  context: ReviewContext;
+  temperature?: number;
+  maxTokens?: number;
+}
+
+export interface AnalysisResult {
+  review: CodeReviewResult;
+  providerUsed: string;
+  modelUsed: string;
+  durationMs: number;
+}
+
+export class CodeReviewAnalyzer {
+  constructor(private registry: AIProviderRegistry) {}
+
+  async analyze(options: AnalyzeOptions): Promise<AnalysisResult> {
+    const { files, context, temperature, maxTokens } = options;
+
+    if (files.length === 0) {
+      logger.warn('No files to analyze');
+
+      return {
+        review: {
+          inlineComments: [],
+          summary: {
+            overallAssessment: 'No reviewable files found in this merge request.',
+            positiveAspects: [],
+            concerns: [],
+            recommendations: [],
+            criticalIssuesCount: 0,
+            majorIssuesCount: 0,
+            minorIssuesCount: 0,
+            suggestionsCount: 0,
+          },
+        },
+        providerUsed: 'none',
+        modelUsed: 'none',
+        durationMs: 0,
+      };
+    }
+
+    const systemPrompt = buildSystemPrompt();
+    const userPrompt = buildUserPrompt(files, context);
+
+    logger.info(
+      {
+        filesCount: files.length,
+        project: context.projectName,
+        mrTitle: context.mrTitle,
+      },
+      'Starting code analysis',
+    );
+
+    const startTime = Date.now();
+    const provider = this.registry.getActiveProvider();
+
+    try {
+      const result = await generate(provider, {
+        schema: CodeReviewResultSchema,
+        system: systemPrompt,
+        prompt: userPrompt,
+        temperature,
+        maxTokens,
+      });
+
+      const durationMs = Date.now() - startTime;
+      const validatedReview = this.validateReview(result, files);
+
+      logger.info(
+        {
+          provider: provider.name,
+          model: provider.config.model,
+          durationMs,
+          inlineCommentsCount: validatedReview.inlineComments.length,
+          criticalIssues: validatedReview.summary.criticalIssuesCount,
+          majorIssues: validatedReview.summary.majorIssuesCount,
+        },
+        'Code analysis completed',
+      );
+
+      return {
+        review: validatedReview,
+        providerUsed: provider.name,
+        modelUsed: provider.config.model,
+        durationMs,
+      };
+    } catch (error) {
+      const durationMs = Date.now() - startTime;
+
+      logger.error(
+        { error, durationMs, project: context.projectName },
+        'Code analysis failed',
+      );
+      throw error;
+    }
+  }
+
+  private validateReview(review: CodeReviewResult, files: ParsedFile[]): CodeReviewResult {
+    const fileLineRanges = new Map<string, { minLine: number; maxLine: number }>();
+
+    for (const file of files) {
+      let minLine = Infinity;
+      let maxLine = 0;
+
+      for (const chunk of file.chunks) {
+        for (const change of chunk.changes) {
+          if (change.type !== 'del' && change.lineNumber !== undefined) {
+            minLine = Math.min(minLine, change.lineNumber);
+            maxLine = Math.max(maxLine, change.lineNumber);
+          }
+        }
+      }
+
+      if (minLine !== Infinity) {
+        fileLineRanges.set(file.path, { minLine, maxLine });
+      }
+    }
+
+    const validatedComments = review.inlineComments.filter((comment) => {
+      const range = fileLineRanges.get(comment.file);
+
+      if (!range) {
+        logger.warn(
+          { filePath: comment.file },
+          'Comment references unknown file, skipping',
+        );
+
+        return false;
+      }
+
+      const tolerance = 10;
+
+      if (
+        comment.line < Math.max(1, range.minLine - tolerance)
+        || comment.line > range.maxLine + tolerance
+      ) {
+        logger.warn(
+          { filePath: comment.file, lineNumber: comment.line, range },
+          'Comment line number out of range, skipping',
+        );
+
+        return false;
+      }
+
+      return true;
+    });
+
+    const filteredCount = review.inlineComments.length - validatedComments.length;
+
+    if (filteredCount > 0) {
+      logger.info({ filteredCount }, 'Filtered invalid comments');
+    }
+
+    return {
+      ...review,
+      inlineComments: validatedComments,
+    };
+  }
+}
