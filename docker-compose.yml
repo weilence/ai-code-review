@@ -1,0 +1,61 @@
+services:
+  ai-code-review:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-code-review
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      # Server
+      - PORT=3000
+      - HOST=0.0.0.0
+      - NODE_ENV=production
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+
+      # GitLab Configuration
+      - GITLAB_URL=${GITLAB_URL}
+      - GITLAB_TOKEN=${GITLAB_TOKEN}
+      - GITLAB_WEBHOOK_SECRET=${GITLAB_WEBHOOK_SECRET}
+
+      # AI Provider - Primary (Anthropic recommended)
+      - AI_PRIMARY_TYPE=${AI_PRIMARY_TYPE:-anthropic}
+      - AI_PRIMARY_API_KEY=${AI_PRIMARY_API_KEY}
+      - AI_PRIMARY_MODEL=${AI_PRIMARY_MODEL:-claude-3-5-sonnet-20241022}
+      - AI_PRIMARY_TEMPERATURE=${AI_PRIMARY_TEMPERATURE:-0.3}
+      - AI_PRIMARY_MAX_TOKENS=${AI_PRIMARY_MAX_TOKENS:-4000}
+      - AI_PRIMARY_BASE_URL=${AI_PRIMARY_BASE_URL:-}
+
+      # AI Provider - Fallback 1 (optional)
+      - AI_FALLBACK_1_TYPE=${AI_FALLBACK_1_TYPE:-}
+      - AI_FALLBACK_1_API_KEY=${AI_FALLBACK_1_API_KEY:-}
+      - AI_FALLBACK_1_MODEL=${AI_FALLBACK_1_MODEL:-}
+      - AI_FALLBACK_1_BASE_URL=${AI_FALLBACK_1_BASE_URL:-}
+
+      # Webhook Events
+      - WEBHOOK_MR_ENABLED=${WEBHOOK_MR_ENABLED:-true}
+      - WEBHOOK_MR_EVENTS=${WEBHOOK_MR_EVENTS:-open,update}
+      - WEBHOOK_MR_REVIEW_DRAFTS=${WEBHOOK_MR_REVIEW_DRAFTS:-false}
+      - WEBHOOK_PUSH_ENABLED=${WEBHOOK_PUSH_ENABLED:-false}
+      - WEBHOOK_PUSH_BRANCHES=${WEBHOOK_PUSH_BRANCHES:-}
+      - WEBHOOK_NOTE_ENABLED=${WEBHOOK_NOTE_ENABLED:-true}
+      - WEBHOOK_NOTE_COMMANDS=${WEBHOOK_NOTE_COMMANDS:-/review,/ai-review}
+
+      # Review Settings
+      - REVIEW_MAX_FILES=${REVIEW_MAX_FILES:-50}
+      - REVIEW_MAX_LINES_PER_FILE=${REVIEW_MAX_LINES_PER_FILE:-1000}
+      - REVIEW_SKIP_FILES=${REVIEW_SKIP_FILES:-}
+      - REVIEW_INLINE_COMMENTS=${REVIEW_INLINE_COMMENTS:-true}
+      - REVIEW_SUMMARY_COMMENT=${REVIEW_SUMMARY_COMMENT:-true}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
