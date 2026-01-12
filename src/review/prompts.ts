@@ -166,3 +166,11 @@ export function formatInlineComment(
 
   return body;
 }
+
+export function formatPendingComment(): string {
+  return `${AI_COMMENT_MARKER}\n## 🔄 AI Code Review\n\nReview in progress...`;
+}
+
+export function formatErrorComment(error: string): string {
+  return `${AI_COMMENT_MARKER}\n## ❌ AI Code Review Failed\n\n${error}`;
+}

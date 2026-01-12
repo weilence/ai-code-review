@@ -67,6 +67,8 @@ export const AppConfigSchema = z.object({
     inlineComments: booleanString(true),
     summaryComment: booleanString(true),
     language: z.enum(['zh', 'en']).default('en'),
+    failureBehavior: z.enum(['blocking', 'non-blocking']).default('non-blocking'),
+    failureThreshold: z.enum(['critical', 'major', 'minor', 'suggestion']).default('critical'),
   }),
 
   log: z.object({

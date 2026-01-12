@@ -4,8 +4,8 @@ import parseDiff from 'parse-diff';
 import { filterReviewableFiles, type ParsedFile, type ParsedChunk } from '../gitlab/review-files';
 import type { GitLabMergeRequestChanges } from '../gitlab/types';
 import { CodeReviewAnalyzer, type AnalysisResult } from './analyzer';
-import { formatSummaryComment, formatInlineComment, type ReviewContext, AI_COMMENT_MARKER } from './prompts';
-import type { InlineComment } from './schema';
+import { formatSummaryComment, formatInlineComment, formatPendingComment, formatErrorComment, type ReviewContext, AI_COMMENT_MARKER } from './prompts';
+import type { InlineComment, Summary, Severity } from './schema';
 import type { ReviewConfig } from '../config/schema';
 import { createLogger } from '../utils/logger';
 
@@ -41,15 +41,45 @@ export class ReviewEngine {
 
     logger.info({ projectId, mrIid }, 'Starting merge request review');
 
-    // Fetch MR changes from GitLab
     const mrChanges = await this.gitlabClient.getMergeRequestChanges(projectId, mrIid);
+    const commitSha = mrChanges.diff_refs.head_sha;
 
-    // Parse and filter files
+    const { summaryNoteId } = await this.cleanupOldComments(projectId, mrIid);
+
+    let statusNoteId: number | null = summaryNoteId;
+
+    try {
+      await this.gitlabClient.setCommitStatus(projectId, commitSha, 'running', {
+        description: 'AI code review in progress',
+      });
+
+      if (!statusNoteId) {
+        const note = await this.gitlabClient.postNote(projectId, mrIid, formatPendingComment());
+
+        statusNoteId = note.id;
+      } else {
+        await this.gitlabClient.updateNote(projectId, mrIid, statusNoteId, formatPendingComment());
+      }
+    } catch (error) {
+      logger.warn({ error }, 'Failed to set initial status');
+    }
+
     const parsedFiles = this.parseChanges(mrChanges);
     const reviewableFiles = filterReviewableFiles(parsedFiles, this.reviewConfig);
 
     if (reviewableFiles.length === 0) {
       logger.info({ projectId, mrIid }, 'No reviewable files after filtering');
+
+      await this.setFinalStatus(projectId, mrIid, commitSha, statusNoteId, 'success', {
+        overallAssessment: 'No reviewable code changes found in this merge request.',
+        positiveAspects: [],
+        concerns: [],
+        recommendations: [],
+        criticalIssuesCount: 0,
+        majorIssuesCount: 0,
+        minorIssuesCount: 0,
+        suggestionsCount: 0,
+      }, mrChanges);
 
       return {
         analysis: {
@@ -71,12 +101,11 @@ export class ReviewEngine {
           durationMs: 0,
         },
         inlineCommentsPosted: 0,
-        summaryPosted: false,
+        summaryPosted: true,
         errors: [],
       };
     }
 
-    // Build review context
     const context: ReviewContext = {
       projectName: mrChanges.web_url.split('/').slice(3, 5).join('/'),
       mrTitle: mrChanges.title,
@@ -86,16 +115,25 @@ export class ReviewEngine {
       targetBranch: mrChanges.target_branch,
     };
 
-    const analysis = await this.analyzer.analyze({
-      files: reviewableFiles,
-      context,
-      language: this.reviewConfig.language,
-    });
+    let analysis: AnalysisResult;
 
-    const { summaryNoteId } = await this.cleanupOldComments(projectId, mrIid);
+    try {
+      analysis = await this.analyzer.analyze({
+        files: reviewableFiles,
+        context,
+        language: this.reviewConfig.language,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      logger.error({ error, projectId, mrIid }, 'AI analysis failed');
+
+      await this.setFailedStatus(projectId, commitSha, statusNoteId, mrIid, errorMessage);
+
+      throw error;
+    }
 
     let inlineCommentsPosted = 0;
-    let summaryPosted = false;
 
     if (this.reviewConfig.inlineComments && analysis.review.inlineComments.length > 0) {
       for (const comment of analysis.review.inlineComments) {
@@ -117,32 +155,17 @@ export class ReviewEngine {
       }
     }
 
-    if (this.reviewConfig.summaryComment) {
-      try {
-        const summaryBody = formatSummaryComment(analysis.review.summary, context);
+    const shouldFail = this.hasIssuesAboveThreshold(analysis.review.summary);
+    const state = shouldFail && this.reviewConfig.failureBehavior === 'blocking' ? 'failed' : 'success';
 
-        if (summaryNoteId) {
-          await this.gitlabClient.updateNote(projectId, mrIid, summaryNoteId, summaryBody);
-          logger.info({ projectId, mrIid, noteId: summaryNoteId }, 'Updated existing summary comment');
-        } else {
-          await this.gitlabClient.postNote(projectId, mrIid, summaryBody);
-          logger.info({ projectId, mrIid }, 'Posted new summary comment');
-        }
-        summaryPosted = true;
-      } catch (error) {
-        const errorMsg = `Failed to post summary comment: ${error as string}`;
-
-        logger.error({ error }, errorMsg);
-        errors.push(errorMsg);
-      }
-    }
+    await this.setFinalStatus(projectId, mrIid, commitSha, statusNoteId, state, analysis.review.summary, mrChanges);
 
     logger.info(
       {
         projectId,
         mrIid,
         inlineCommentsPosted,
-        summaryPosted,
+        summaryPosted: true,
         errorsCount: errors.length,
         providerUsed: analysis.providerUsed,
       },
@@ -152,9 +175,90 @@ export class ReviewEngine {
     return {
       analysis,
       inlineCommentsPosted,
-      summaryPosted,
+      summaryPosted: true,
       errors,
     };
+  }
+
+  private async setFinalStatus(
+    projectId: number | string,
+    mrIid: number,
+    commitSha: string,
+    noteId: number | null,
+    state: 'success' | 'failed',
+    summary: Summary,
+    mrChanges: GitLabMergeRequestChanges,
+  ): Promise<void> {
+    const context: ReviewContext = {
+      projectName: mrChanges.web_url.split('/').slice(3, 5).join('/'),
+      mrTitle: mrChanges.title,
+      mrDescription: mrChanges.description || undefined,
+      author: mrChanges.author.username,
+      sourceBranch: mrChanges.source_branch,
+      targetBranch: mrChanges.target_branch,
+    };
+
+    const totalIssues = summary.criticalIssuesCount + summary.majorIssuesCount + summary.minorIssuesCount;
+    let description: string;
+
+    if (totalIssues === 0) {
+      description = 'No issues found';
+    } else if (state === 'failed') {
+      description = `Found ${totalIssues} issue(s)`;
+    } else {
+      description = `⚠️ Found ${totalIssues} issue(s)`;
+    }
+
+    try {
+      await this.gitlabClient.setCommitStatus(projectId, commitSha, state, { description });
+    } catch (error) {
+      logger.warn({ error }, 'Failed to set commit status');
+    }
+
+    if (this.reviewConfig.summaryComment) {
+      try {
+        const summaryBody = formatSummaryComment(summary, context);
+
+        if (noteId) {
+          await this.gitlabClient.updateNote(projectId, mrIid, noteId, summaryBody);
+        } else {
+          await this.gitlabClient.postNote(projectId, mrIid, summaryBody);
+        }
+      } catch (error) {
+        logger.warn({ error }, 'Failed to update summary comment');
+      }
+    }
+  }
+
+  private async setFailedStatus(
+    projectId: number | string,
+    commitSha: string,
+    noteId: number | null,
+    mrIid: number,
+    errorMessage: string,
+  ): Promise<void> {
+    const state = this.reviewConfig.failureBehavior === 'blocking' ? 'failed' : 'success';
+    const description = this.reviewConfig.failureBehavior === 'blocking'
+      ? errorMessage.substring(0, 255)
+      : `⚠️ ${errorMessage.substring(0, 250)}`;
+
+    try {
+      await this.gitlabClient.setCommitStatus(projectId, commitSha, state, { description });
+    } catch (error) {
+      logger.warn({ error }, 'Failed to set commit status');
+    }
+
+    try {
+      const errorBody = formatErrorComment(errorMessage);
+
+      if (noteId) {
+        await this.gitlabClient.updateNote(projectId, mrIid, noteId, errorBody);
+      } else {
+        await this.gitlabClient.postNote(projectId, mrIid, errorBody);
+      }
+    } catch (error) {
+      logger.warn({ error }, 'Failed to post error comment');
+    }
   }
 
   private parseChanges(mrChanges: GitLabMergeRequestChanges): ParsedFile[] {
@@ -281,5 +385,28 @@ export class ReviewEngine {
     logger.info({ projectId, mrIid, inlineDeleted, hasSummary: summaryNoteId !== null }, 'Cleaned up old AI comments');
 
     return { inlineDeleted, summaryNoteId };
+  }
+
+  private hasIssuesAboveThreshold(summary: Summary): boolean {
+    const threshold = this.reviewConfig.failureThreshold;
+    const severityOrder: Severity[] = ['critical', 'major', 'minor', 'suggestion'];
+    const thresholdIndex = severityOrder.indexOf(threshold);
+
+    const counts: Record<Severity, number> = {
+      critical: summary.criticalIssuesCount,
+      major: summary.majorIssuesCount,
+      minor: summary.minorIssuesCount,
+      suggestion: summary.suggestionsCount,
+    };
+
+    for (let i = 0; i <= thresholdIndex; i++) {
+      const severity = severityOrder[i];
+
+      if (severity && counts[severity] > 0) {
+        return true;
+      }
+    }
+
+    return false;
   }
 }

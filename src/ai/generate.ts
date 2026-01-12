@@ -1,4 +1,4 @@
-import { generateText, Output, type SystemModelMessage } from 'ai';
+import { generateText, Output, type SystemModelMessage, APICallError } from 'ai';
 import type { z } from 'zod';
 import type { RegisteredProvider } from './registry';
 import { createLogger } from '../utils/logger';
@@ -77,10 +77,22 @@ export async function generate<T>(
 
     return output;
   } catch (error) {
-    logger.error(
-      { provider: provider.name, error: error },
-      'Provider generation failed',
-    );
+    if (APICallError.isInstance(error)) {
+      logger.error(
+        {
+          provider: provider.name,
+          statusCode: error.statusCode,
+          responseBody: error.responseBody,
+          url: error.url,
+        },
+        'API call failed',
+      );
+    } else {
+      logger.error(
+        { provider: provider.name, error },
+        'Provider generation failed',
+      );
+    }
     throw error;
   }
 }

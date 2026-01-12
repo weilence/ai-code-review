@@ -156,4 +156,23 @@ export class GitLabClient {
 
     return note as unknown as GitLabNote;
   }
+
+  async setCommitStatus(
+    projectId: number | string,
+    sha: string,
+    state: 'pending' | 'running' | 'success' | 'failed' | 'canceled',
+    options?: {
+      name?: string;
+      description?: string;
+      targetUrl?: string;
+    },
+  ): Promise<void> {
+    logger.debug({ projectId, sha, state, name: options?.name }, 'Setting commit status');
+
+    await this.api.Commits.editStatus(projectId, sha, state, {
+      name: options?.name ?? 'ai-code-review',
+      description: options?.description,
+      targetUrl: options?.targetUrl,
+    });
+  }
 }
