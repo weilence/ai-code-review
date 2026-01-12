@@ -1,3 +1,4 @@
+import type { Language } from '../config/schema';
 import type { ParsedFile } from '../gitlab/review-files';
 import { formatDiffForPrompt } from '../gitlab/review-files';
 import type { InlineComment, Summary } from './schema';
@@ -13,8 +14,8 @@ export interface ReviewContext {
   targetBranch: string;
 }
 
-export function buildSystemPrompt(): string {
-  return `You are an expert code reviewer with extensive experience in software development best practices.
+export function buildSystemPrompt(language?: Language): string {
+  let prompt = `You are an expert code reviewer with extensive experience in software development best practices.
 Your role is to analyze code changes and provide constructive, actionable feedback.
 
 ## Your Review Focus Areas:
@@ -39,9 +40,14 @@ Your role is to analyze code changes and provide constructive, actionable feedba
 
 ## Output Requirements:
 - Provide inline comments with specific file paths and line numbers
-- Include code suggestions when applicable
 - Write a summary with overall assessment
 - Count issues by severity for the summary`;
+
+  if (language) {
+    prompt += `\n\n## Language\nRespond in ${language}.`;
+  }
+
+  return prompt;
 }
 
 export function buildUserPrompt(

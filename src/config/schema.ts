@@ -3,9 +3,10 @@ import { z } from 'zod';
 const AIProviderConfigSchema = z.object({
   apiKey: z.string().optional(),
   baseUrl: z.string().optional(),
+  provider: z.string().optional(),
   model: z.string(),
-  temperature: z.coerce.number().min(0).max(2).default(0.3),
-  maxTokens: z.coerce.number().positive().default(4000),
+  temperature: z.coerce.number().optional(),
+  maxTokens: z.coerce.number().positive().optional(),
 });
 
 export type AIProviderConfig = z.infer<typeof AIProviderConfigSchema>;
@@ -66,7 +67,7 @@ export const AppConfigSchema = z.object({
     skipFiles: commaSeparated(['*.lock', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', '*.min.js', '*.min.css']),
     inlineComments: booleanString(true),
     summaryComment: booleanString(true),
-    language: z.enum(['zh', 'en']).default('en'),
+    language: z.enum(['简体中文', 'English']).optional(),
     failureBehavior: z.enum(['blocking', 'non-blocking']).default('non-blocking'),
     failureThreshold: z.enum(['critical', 'major', 'minor', 'suggestion']).default('critical'),
   }),
@@ -77,6 +78,7 @@ export const AppConfigSchema = z.object({
 });
 
 export type AppConfig = z.infer<typeof AppConfigSchema>;
+export type Language = AppConfig['review']['language'];
 export type AIConfig = AppConfig['ai'];
 export type GitLabConfig = AppConfig['gitlab'];
 export type WebhookEventsConfig = AppConfig['webhook'];

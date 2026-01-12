@@ -4,6 +4,7 @@ import { CodeReviewResultSchema, type CodeReviewResult } from './schema';
 import { buildSystemPrompt, buildUserPrompt, type ReviewContext } from './prompts';
 import type { ParsedFile } from '../gitlab/review-files';
 import { createLogger } from '../utils/logger';
+import type { Language } from '../config/schema';
 
 const logger = createLogger('code-analyzer');
 
@@ -12,7 +13,7 @@ export interface AnalyzeOptions {
   context: ReviewContext;
   temperature?: number;
   maxTokens?: number;
-  language?: 'zh' | 'en';
+  language?: Language;
 }
 
 export interface AnalysisResult {
@@ -51,7 +52,7 @@ export class CodeReviewAnalyzer {
       };
     }
 
-    const systemPrompt = buildSystemPrompt();
+    const systemPrompt = buildSystemPrompt(language);
     const userPrompt = buildUserPrompt(files, context);
 
     logger.info(
@@ -73,7 +74,6 @@ export class CodeReviewAnalyzer {
         prompt: userPrompt,
         temperature,
         maxTokens,
-        language,
       });
 
       const durationMs = Date.now() - startTime;

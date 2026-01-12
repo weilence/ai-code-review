@@ -237,13 +237,10 @@ export class ReviewEngine {
     mrIid: number,
     errorMessage: string,
   ): Promise<void> {
-    const state = this.reviewConfig.failureBehavior === 'blocking' ? 'failed' : 'success';
-    const description = this.reviewConfig.failureBehavior === 'blocking'
-      ? errorMessage.substring(0, 255)
-      : `⚠️ ${errorMessage.substring(0, 250)}`;
+    const description = `Review failed: ${errorMessage.substring(0, 240)}`;
 
     try {
-      await this.gitlabClient.setCommitStatus(projectId, commitSha, state, { description });
+      await this.gitlabClient.setCommitStatus(projectId, commitSha, 'failed', { description });
     } catch (error) {
       logger.warn({ error }, 'Failed to set commit status');
     }
