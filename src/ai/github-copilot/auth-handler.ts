@@ -2,14 +2,14 @@ import { streamSSE } from 'hono/streaming';
 import type { Context } from 'hono';
 import { getCopilotAuthClient } from './client';
 import { DeviceCodeRequestSchema, type ErrorResponse } from './types';
-import { CopilotAuthError } from '../../../utils/errors';
-import { createLogger } from '../../../utils/logger';
+import { CopilotAuthError } from '../../utils/errors';
+import { createLogger } from '../../utils/logger';
 import type { CopilotTokenStorage } from './token-storage';
 
 const logger = createLogger('copilot-auth');
 
 export class CopilotAuthHandler {
-  constructor(private readonly tokenStorage: CopilotTokenStorage) {}
+  constructor(private readonly tokenStorage: CopilotTokenStorage) { }
 
   async handleLogin(c: Context): Promise<Response> {
     const body: unknown = await c.req.json().catch(() => ({}));

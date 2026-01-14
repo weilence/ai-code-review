@@ -1,4 +1,4 @@
-import { createLogger } from '../../../utils/logger';
+import { createLogger } from '../../utils/logger';
 import { getCopilotAuthClient } from './client';
 
 const logger = createLogger('copilot-token');

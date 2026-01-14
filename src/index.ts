@@ -8,7 +8,6 @@ import { createLogger } from './utils/logger';
 import {
   reviewEngine,
   copilotTokenStorage,
-  aiRegistry,
 } from './bootstrap';
 import { config } from './config';
 
@@ -29,7 +28,6 @@ app.get('/health', (c) => {
 
 app.get('/ready', (c) => {
   const checks = {
-    aiProviders: aiRegistry.getAllProviders().length > 0,
     gitlabConfigured: Boolean(config.gitlab.url && config.gitlab.token),
     webhookSecretConfigured: Boolean(config.gitlab.webhookSecret),
   };

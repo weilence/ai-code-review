@@ -1,7 +1,7 @@
 import { generateText, Output, APICallError } from 'ai';
 import type { z } from 'zod';
-import type { RegisteredProvider } from './registry';
 import { createLogger } from '../utils/logger';
+import type { LanguageModelV3 } from '@ai-sdk/provider';
 
 const logger = createLogger('ai-generate');
 
@@ -14,24 +14,24 @@ export interface GenerateOptions<T> {
 }
 
 export async function generate<T>(
-  provider: RegisteredProvider,
+  model: LanguageModelV3,
   options: GenerateOptions<T>,
 ): Promise<T> {
   logger.debug(
-    { provider: provider.name, model: provider.config.model },
+    { provider: model.provider, model: model.modelId },
     'Generating with provider',
   );
 
   try {
     const { output } = await generateText({
-      model: provider.model,
+      model,
       prompt: options.prompt,
       system: options.system,
       output: Output.object({ schema: options.schema }),
     });
 
     logger.info(
-      { provider: provider.name, model: provider.config.model },
+      { provider: model.provider, model: model.modelId },
       'Successfully generated with provider',
     );
 
@@ -40,7 +40,7 @@ export async function generate<T>(
     if (APICallError.isInstance(error)) {
       logger.error(
         {
-          provider: provider.name,
+          provider: model.provider,
           statusCode: error.statusCode,
           responseBody: error.responseBody,
           url: error.url,
@@ -49,7 +49,7 @@ export async function generate<T>(
       );
     } else {
       logger.error(
-        { provider: provider.name, error },
+        { provider: model.provider, error },
         'Provider generation failed',
       );
     }

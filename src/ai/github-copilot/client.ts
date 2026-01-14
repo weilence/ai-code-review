@@ -8,8 +8,8 @@ import {
   type CopilotTokenResponse,
   type OAuthError,
 } from './types';
-import { CopilotAuthError } from '../../../utils/errors';
-import { createLogger } from '../../../utils/logger';
+import { CopilotAuthError } from '../../utils/errors';
+import { createLogger } from '../../utils/logger';
 
 const logger = createLogger('copilot-client');
 

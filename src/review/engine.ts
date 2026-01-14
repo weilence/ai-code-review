@@ -1,4 +1,4 @@
-import type { AIProviderRegistry } from '../ai/registry';
+import type { LanguageModelId, Registry } from '../ai/registry';
 import type { GitLabClient } from '../gitlab/client';
 import parseDiff from 'parse-diff';
 import { filterReviewableFiles, type ParsedFile, type ParsedChunk } from '../gitlab/review-files';
@@ -28,8 +28,9 @@ export class ReviewEngine {
   private analyzer: CodeReviewAnalyzer;
 
   constructor(
+    aiRegistry: Registry,
+    private modelId: LanguageModelId,
     private gitlabClient: GitLabClient,
-    private aiRegistry: AIProviderRegistry,
     private reviewConfig: ReviewConfig,
   ) {
     this.analyzer = new CodeReviewAnalyzer(aiRegistry);
@@ -119,9 +120,10 @@ export class ReviewEngine {
 
     try {
       analysis = await this.analyzer.analyze({
+        modelId: this.modelId,
+        language: this.reviewConfig.language,
         files: reviewableFiles,
         context,
-        language: this.reviewConfig.language,
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

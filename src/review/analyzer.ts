@@ -1,4 +1,4 @@
-import type { AIProviderRegistry } from '../ai/registry';
+import type { LanguageModelId, Registry } from '../ai/registry';
 import { generate } from '../ai/generate';
 import { CodeReviewResultSchema, type CodeReviewResult } from './schema';
 import { buildSystemPrompt, buildUserPrompt, type ReviewContext } from './prompts';
@@ -9,8 +9,9 @@ import type { Language } from '../config/schema';
 const logger = createLogger('code-analyzer');
 
 export interface AnalyzeOptions {
-  files: ParsedFile[];
   context: ReviewContext;
+  modelId: LanguageModelId;
+  files: ParsedFile[];
   temperature?: number;
   maxTokens?: number;
   language?: Language;
@@ -24,7 +25,7 @@ export interface AnalysisResult {
 }
 
 export class CodeReviewAnalyzer {
-  constructor(private registry: AIProviderRegistry) {}
+  constructor(private registry: Registry) { }
 
   async analyze(options: AnalyzeOptions): Promise<AnalysisResult> {
     const { files, context, temperature, maxTokens, language } = options;
@@ -65,10 +66,10 @@ export class CodeReviewAnalyzer {
     );
 
     const startTime = Date.now();
-    const provider = this.registry.getActiveProvider();
+    const model = this.registry.languageModel(options.modelId);
 
     try {
-      const result = await generate(provider, {
+      const result = await generate(model, {
         schema: CodeReviewResultSchema,
         system: systemPrompt,
         prompt: userPrompt,
@@ -81,8 +82,8 @@ export class CodeReviewAnalyzer {
 
       logger.info(
         {
-          provider: provider.name,
-          model: provider.config.model,
+          provider: model.provider,
+          model: model.modelId,
           durationMs,
           inlineCommentsCount: validatedReview.inlineComments.length,
           criticalIssues: validatedReview.summary.criticalIssuesCount,
@@ -93,8 +94,8 @@ export class CodeReviewAnalyzer {
 
       return {
         review: validatedReview,
-        providerUsed: provider.name,
-        modelUsed: provider.config.model,
+        providerUsed: model.provider,
+        modelUsed: model.modelId,
         durationMs,
       };
     } catch (error) {

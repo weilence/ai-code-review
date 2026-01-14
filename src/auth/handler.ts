@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { CopilotAuthHandler, type CopilotTokenStorage } from '../ai/providers/github-copilot';
+import { CopilotAuthHandler, type CopilotTokenStorage } from '../ai/github-copilot';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('auth');
