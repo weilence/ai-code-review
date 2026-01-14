@@ -1,4 +1,4 @@
-import { createProviderRegistry, customProvider, wrapLanguageModel } from 'ai';
+import { createProviderRegistry, wrapLanguageModel } from 'ai';
 import type { AIConfig } from '../config/schema';
 import { createLogger } from '../utils/logger';
 import { createOpenAI } from '@ai-sdk/openai';
@@ -6,10 +6,11 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { EmbeddingModelV3, ImageModelV3, LanguageModelV3, RerankingModelV3, SpeechModelV3, TranscriptionModelV3 } from '@ai-sdk/provider';
 import { devToolsMiddleware } from '@ai-sdk/devtools';
+import { type CopilotTokenStorage, createGitHubCopilot as createGitHubCopilot, HEADERS } from './github-copilot';
 
 const logger = createLogger('ai-registry');
 
-function createRegistry(config: AIConfig) {
+function createRegistry(config: AIConfig, copilotTokenStorage: CopilotTokenStorage) {
   logger.info('Creating AI provider registry');
 
   return createProviderRegistry({
@@ -24,21 +25,27 @@ function createRegistry(config: AIConfig) {
     'openai-compatible': createOpenAICompatible({
       apiKey: config['openai-compatible']?.apiKey,
       baseURL: config['openai-compatible']?.baseUrl ?? '',
-      name: config['openai-compatible']?.provider ?? 'openai-compatible',
+      name: config.provider ?? 'openai-compatible',
+      supportsStructuredOutputs: true,
     }),
-    'github-copilot': customProvider({}),
+    'github-copilot': createGitHubCopilot(
+      {
+        ...config['github-copilot'],
+        headers: HEADERS,
+      },
+      copilotTokenStorage),
   });
 }
 
 export class AICodeReviewRegistry implements Registry {
   private registry: ReturnType<typeof createRegistry>;
 
-  constructor(config: AIConfig) {
-    this.registry = createRegistry(config);
+  constructor(config: AIConfig, copilotTokenStorage: CopilotTokenStorage) {
+    this.registry = createRegistry(config, copilotTokenStorage);
   }
 
   languageModel(id: LanguageModelId): LanguageModelV3 {
-    const model = this.registry.languageModel(id);
+    const model = this.registry.languageModel(id) as LanguageModelV3 & { supportsStructuredOutputs?: boolean };
 
     return wrapLanguageModel({
       model,
@@ -46,22 +53,38 @@ export class AICodeReviewRegistry implements Registry {
         {
           specificationVersion: 'v3',
           transformParams: ({ params }) => {
-            if (model.modelId.startsWith('glm-4.7-free')) {
-              if (params.responseFormat?.type === 'json') {
-                if (params.responseFormat.schema) {
-                  const schema = params.responseFormat.schema;
+            if (model.supportsStructuredOutputs && params.responseFormat?.type === 'json') {
+              if (params.responseFormat.schema) {
+                const schema = params.responseFormat.schema;
 
-                  delete schema.$schema;
-                  delete schema.additionalProperties;
+                delete schema.$schema;
+                delete schema.additionalProperties;
 
-                  params.prompt.push({
-                    role: 'system',
-                    content: `Respond in the following JSON Schema format:\n${JSON.stringify(schema)}`,
-                  });
+                let userIndex = params.prompt.findIndex(p => p.role === 'user');
 
-                  delete params.responseFormat.schema;
+                if (userIndex === -1) {
+                  userIndex = params.prompt.length;
                 }
+
+                params.prompt.splice(userIndex, 0, {
+                  role: 'system',
+                  content: `Respond in the following JSON Schema format:\n${JSON.stringify(schema)}`,
+                });
+
+                delete params.responseFormat.schema;
               }
+            }
+
+            const provider = id.split(':')[0];
+
+            if (provider && model.modelId.startsWith('glm-4.7')) {
+              params.providerOptions = {
+                [provider]: {
+                  thinking: {
+                    type: 'disabled',
+                  },
+                },
+              };
             }
 
             return Promise.resolve(params);

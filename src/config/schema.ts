@@ -3,10 +3,6 @@ import { z } from 'zod';
 const AIProviderConfigSchema = z.object({
   apiKey: z.string().optional(),
   baseUrl: z.string().optional(),
-  provider: z.string().optional(),
-  model: z.string(),
-  temperature: z.coerce.number().optional(),
-  maxTokens: z.coerce.number().positive().optional(),
 });
 
 export type AIProviderConfig = z.infer<typeof AIProviderConfigSchema>;
@@ -32,16 +28,13 @@ export const AppConfigSchema = z.object({
   }),
 
   ai: z.object({
-    'providers': z.string().transform(s => s.split(',').map(x => x.trim()).filter(Boolean)),
-    'anthropic': AIProviderConfigSchema.extend({
-      model: z.string().default('claude-sonnet-4-20250514'),
-    }).optional(),
-    'openai': AIProviderConfigSchema.extend({
-      model: z.string().default('gpt-4o'),
-    }).optional(),
-    'github-copilot': AIProviderConfigSchema.extend({
-      model: z.string().default('claude-sonnet-4'),
-    }).optional(),
+    'models': z.string().transform(s => s.split(',').map(x => x.trim()).filter(Boolean)),
+    'provider': z.string().optional(),
+    'temperature': z.coerce.number().optional(),
+    'maxTokens': z.coerce.number().positive().optional(),
+    'anthropic': AIProviderConfigSchema.optional(),
+    'openai': AIProviderConfigSchema.optional(),
+    'github-copilot': AIProviderConfigSchema.optional(),
     'openai-compatible': AIProviderConfigSchema.optional(),
   }),
 
@@ -83,4 +76,3 @@ export type AIConfig = AppConfig['ai'];
 export type GitLabConfig = AppConfig['gitlab'];
 export type WebhookEventsConfig = AppConfig['webhook'];
 export type ReviewConfig = AppConfig['review'];
-export type AIProviderType = keyof Omit<AppConfig['ai'], 'providers'>;

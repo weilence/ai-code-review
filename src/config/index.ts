@@ -29,4 +29,4 @@ export function loadConfig(): AppConfig {
 
 export const config = loadConfig();
 
-export type { AppConfig, AIProviderConfig, AIProviderType } from './schema';
+export type { AppConfig, AIProviderConfig } from './schema';

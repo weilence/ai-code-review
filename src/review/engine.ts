@@ -71,31 +71,20 @@ export class ReviewEngine {
     if (reviewableFiles.length === 0) {
       logger.info({ projectId, mrIid }, 'No reviewable files after filtering');
 
-      await this.setFinalStatus(projectId, mrIid, commitSha, statusNoteId, 'success', {
+      const reviewSummary = {
         overallAssessment: 'No reviewable code changes found in this merge request.',
         positiveAspects: [],
         concerns: [],
-        recommendations: [],
-        criticalIssuesCount: 0,
-        majorIssuesCount: 0,
-        minorIssuesCount: 0,
-        suggestionsCount: 0,
-      }, mrChanges);
+        issuesCount: { critical: 0, major: 0, minor: 0, suggestion: 0 },
+      };
+
+      await this.setFinalStatus(projectId, mrIid, commitSha, statusNoteId, 'success', reviewSummary);
 
       return {
         analysis: {
           review: {
             inlineComments: [],
-            summary: {
-              overallAssessment: 'No reviewable code changes found in this merge request.',
-              positiveAspects: [],
-              concerns: [],
-              recommendations: [],
-              criticalIssuesCount: 0,
-              majorIssuesCount: 0,
-              minorIssuesCount: 0,
-              suggestionsCount: 0,
-            },
+            summary: reviewSummary,
           },
           providerUsed: 'none',
           modelUsed: 'none',
@@ -160,7 +149,7 @@ export class ReviewEngine {
     const shouldFail = this.hasIssuesAboveThreshold(analysis.review.summary);
     const state = shouldFail && this.reviewConfig.failureBehavior === 'blocking' ? 'failed' : 'success';
 
-    await this.setFinalStatus(projectId, mrIid, commitSha, statusNoteId, state, analysis.review.summary, mrChanges);
+    await this.setFinalStatus(projectId, mrIid, commitSha, statusNoteId, state, analysis.review.summary);
 
     logger.info(
       {
@@ -189,18 +178,8 @@ export class ReviewEngine {
     noteId: number | null,
     state: 'success' | 'failed',
     summary: Summary,
-    mrChanges: GitLabMergeRequestChanges,
   ): Promise<void> {
-    const context: ReviewContext = {
-      projectName: mrChanges.web_url.split('/').slice(3, 5).join('/'),
-      mrTitle: mrChanges.title,
-      mrDescription: mrChanges.description || undefined,
-      author: mrChanges.author.username,
-      sourceBranch: mrChanges.source_branch,
-      targetBranch: mrChanges.target_branch,
-    };
-
-    const totalIssues = summary.criticalIssuesCount + summary.majorIssuesCount + summary.minorIssuesCount;
+    const totalIssues = summary.issuesCount.critical + summary.issuesCount.major + summary.issuesCount.minor;
     let description: string;
 
     if (totalIssues === 0) {
@@ -219,7 +198,7 @@ export class ReviewEngine {
 
     if (this.reviewConfig.summaryComment) {
       try {
-        const summaryBody = formatSummaryComment(summary, context);
+        const summaryBody = formatSummaryComment(summary);
 
         if (noteId) {
           await this.gitlabClient.updateNote(projectId, mrIid, noteId, summaryBody);
@@ -323,7 +302,6 @@ export class ReviewEngine {
 
     const body = formatInlineComment({
       severity: comment.severity,
-      category: comment.category,
       message: comment.message,
       suggestedCode: comment.suggestedCode,
     });
@@ -391,17 +369,10 @@ export class ReviewEngine {
     const severityOrder: Severity[] = ['critical', 'major', 'minor', 'suggestion'];
     const thresholdIndex = severityOrder.indexOf(threshold);
 
-    const counts: Record<Severity, number> = {
-      critical: summary.criticalIssuesCount,
-      major: summary.majorIssuesCount,
-      minor: summary.minorIssuesCount,
-      suggestion: summary.suggestionsCount,
-    };
-
     for (let i = 0; i <= thresholdIndex; i++) {
       const severity = severityOrder[i];
 
-      if (severity && counts[severity] > 0) {
+      if (severity && summary.issuesCount[severity] > 0) {
         return true;
       }
     }

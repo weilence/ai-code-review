@@ -1,25 +1,32 @@
 import { wrapLanguageModel } from 'ai';
-import { createGitHubCopilotOpenAICompatible } from '@opeoginni/github-copilot-openai-compatible';
-import type { LanguageModel } from 'ai';
-import type { AIProviderConfig } from '../../../config/schema';
+import { createGitHubCopilotOpenAICompatible, type GitHubCopilotProviderSettings } from '@opeoginni/github-copilot-openai-compatible';
 import type { CopilotTokenStorage } from './token-storage';
 import { createCopilotTokenMiddleware } from './middleware';
-import { HEADERS } from './client';
+import type { EmbeddingModelV3, ImageModelV3, LanguageModelV3, ProviderV3 } from '@ai-sdk/provider';
 
-export function createGitHubCopilotModel(
-  config: AIProviderConfig,
+export function createGitHubCopilot(
+  options: GitHubCopilotProviderSettings,
   tokenStorage: CopilotTokenStorage,
-): LanguageModel {
-  const gihubCopilot = createGitHubCopilotOpenAICompatible({
-    apiKey: config.apiKey ?? 'placeholder',
-    baseURL: config.baseUrl,
-    headers: HEADERS,
-  });
+): ProviderV3 {
+  const githubCopilot = createGitHubCopilotOpenAICompatible(options);
 
-  return wrapLanguageModel({
-    model: gihubCopilot(config.model),
-    middleware: createCopilotTokenMiddleware(tokenStorage),
-  });
+  return {
+    specificationVersion: 'v3',
+    embeddingModel: function (_: string): EmbeddingModelV3 {
+      throw new Error('Function not implemented.');
+    },
+    imageModel: function (_: string): ImageModelV3 {
+      throw new Error('Function not implemented.');
+    },
+    languageModel: function (modelId: string): LanguageModelV3 {
+      return wrapLanguageModel(
+        {
+          model: githubCopilot.languageModel(modelId),
+          middleware: [createCopilotTokenMiddleware(tokenStorage)],
+        },
+      );
+    },
+  } satisfies ProviderV3;
 }
 
 export * from './types';
