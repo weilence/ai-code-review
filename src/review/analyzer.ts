@@ -1,5 +1,5 @@
 import type { LanguageModelId, Registry } from '../ai/registry';
-import { generate } from '../ai/generate';
+import { generateWithAgent } from '../ai/agent';
 import { CodeReviewResultSchema, type CodeReviewResult } from './schema';
 import { buildSystemPrompt, buildUserPrompt, type ReviewContext } from './prompts';
 import type { ParsedFile } from '../gitlab/review-files';
@@ -70,7 +70,7 @@ export class CodeReviewAnalyzer {
     const model = this.registry.languageModel(options.modelId);
 
     try {
-      const result = await generate(model, {
+      const result = await generateWithAgent(model, {
         schema: CodeReviewResultSchema,
         system: systemPrompt,
         prompt: userPrompt,
