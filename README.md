@@ -1,75 +1,36 @@
-# ai-code-review
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-GitLab webhook-triggered AI code review system using Bun runtime and Vercel AI SDK.
+## Getting Started
 
-## Installation
-
-To install dependencies:
+First, run the development server:
 
 ```bash
-bun install
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-## Development
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-To run in development mode with watch:
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-```bash
-bun run dev
-```
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-To run in production mode:
+## Learn More
 
-```bash
-bun run start
-```
+To learn more about Next.js, take a look at the following resources:
 
-## Code Quality
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-### Linting
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-This project uses ESLint with TypeScript support and @stylistic/eslint-plugin for code formatting.
+## Deploy on Vercel
 
-```bash
-# Check for linting errors
-bun run lint
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-# Auto-fix linting errors
-bun run lint:fix
-
-# Format code (alias for lint:fix)
-bun run format
-```
-
-### Type Checking
-
-```bash
-bun run typecheck
-```
-
-### Testing
-
-```bash
-# Run tests
-bun run test
-
-# Run tests in watch mode
-bun run test:watch
-```
-
-## Configuration
-
-See `.env.example` for required environment variables.
-
-## Tech Stack
-
-- **Runtime**: Bun
-- **Framework**: Hono (HTTP server)
-- **AI**: Vercel AI SDK
-- **Validation**: Zod
-- **Logging**: Pino
-- **Code Quality**: ESLint + @stylistic/eslint-plugin
-
----
-
-This project was created using `bun init` in bun v1.3.5. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
