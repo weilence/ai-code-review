@@ -19,51 +19,34 @@ async function seedConfigData(db: ReturnType<typeof drizzle<typeof schema>>) {
   console.log('📝 Seeding configuration data...\n');
 
   const configEntries = [
-    {
-      key: 'gitlab.url',
-      value: '',
-      description: 'GitLab 实例 URL（例如：https://gitlab.com）',
-    },
-    {
-      key: 'gitlab.token',
-      value: '',
-      description: 'GitLab 个人访问令牌',
-    },
-    {
-      key: 'gitlab.webhookSecret',
-      value: '',
-      description: 'GitLab Webhook 验证密钥',
-    },
-    {
-      key: 'ai.provider',
-      value: 'anthropic',
-      description: '默认 AI 提供商（anthropic、openai、github-copilot）',
-    },
-    {
-      key: 'ai.model',
-      value: 'claude-sonnet-4-5',
-      description: '默认 AI 模型',
-    },
-    {
-      key: 'ai.maxTokens',
-      value: 8192,
-      description: 'AI 最大生成 token 数',
-    },
-    {
-      key: 'review.enabled',
-      value: true,
-      description: '是否启用代码审查',
-    },
-    {
-      key: 'review.maxFiles',
-      value: 50,
-      description: '单次审查最大文件数',
-    },
-    {
-      key: 'review.maxLinesPerFile',
-      value: 1000,
-      description: '单个文件最大行数',
-    },
+    // GitLab 配置
+    { key: 'gitlab.url', value: 'https://gitlab.com', description: 'GitLab 实例 URL' },
+    { key: 'gitlab.token', value: '', description: 'GitLab 个人访问令牌' },
+    { key: 'gitlab.webhookSecret', value: '', description: 'GitLab Webhook 验证密钥' },
+
+    // AI 配置 - 保存为逗号分隔的字符串
+    { key: 'ai.models', value: 'anthropic:claude-sonnet-4-5', description: 'AI 模型列表' },
+    { key: 'ai.temperature', value: '0.7', description: 'AI temperature 参数' },
+    { key: 'ai.maxTokens', value: '8192', description: 'AI 最大生成 token 数' },
+
+    // Webhook 配置 - 保存为字符串格式
+    { key: 'webhook.mr.enabled', value: 'true', description: '启用 MR 事件' },
+    { key: 'webhook.mr.events', value: 'open, update', description: 'MR 事件类型' },
+    { key: 'webhook.mr.reviewDrafts', value: 'false', description: '审查 Draft MR' },
+
+    { key: 'webhook.push.enabled', value: 'false', description: '启用 Push 事件' },
+    { key: 'webhook.push.branches', value: '', description: 'Push 事件监听分支' },
+
+    { key: 'webhook.note.enabled', value: 'true', description: '启用 Note 事件' },
+    { key: 'webhook.note.commands', value: '/review, /ai-review', description: 'Note 事件触发命令' },
+
+    // Review 配置
+    { key: 'review.maxFiles', value: '50', description: '单次审查最大文件数' },
+    { key: 'review.maxLinesPerFile', value: '1000', description: '单个文件最大行数' },
+    { key: 'review.skipFiles', value: '*.lock, package-lock.json, yarn.lock, pnpm-lock.yaml, bun.lockb, *.min.js, *.min.css', description: '跳过的文件模式' },
+    { key: 'review.language', value: '简体中文', description: '审查语言' },
+    { key: 'review.failureBehavior', value: 'non-blocking', description: '失败行为' },
+    { key: 'review.failureThreshold', value: 'critical', description: '失败阈值' },
   ];
 
   for (const entry of configEntries) {

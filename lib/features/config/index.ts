@@ -6,7 +6,7 @@
 
 export {
   getConfig,
-  loadConfigFromEnv,
+  loadSystemConfigFromEnv,
   loadConfigFromDB,
   setConfigValue,
   setConfigValues,

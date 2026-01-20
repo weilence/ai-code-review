@@ -8,71 +8,15 @@ import { AppConfigSchema, type AppConfig } from './schema';
 // ============================================================================
 
 /**
- * 从环境变量加载配置（Next.js 风格）
- * 支持 GITLAB__URL、GITLAB__TOKEN 等格式
+ * 从环境变量加载系统级配置
+ * 只有 port、host 等启动时配置从环境变量读取
+ * 业务配置（GitLab、AI、Review 等）从数据库读取
  */
-export function loadConfigFromEnv(): AppConfig {
-  const envConfig: Record<string, unknown> = {
-    port: process.env.PORT,
+export function loadSystemConfigFromEnv(): Partial<AppConfig> {
+  return {
+    port: process.env.PORT ? Number(process.env.PORT) : undefined,
     host: process.env.HOST,
-    gitlab: {
-      url: process.env.GITLAB_URL,
-      token: process.env.GITLAB_TOKEN,
-      webhookSecret: process.env.GITLAB_WEBHOOK_SECRET,
-    },
-    ai: {
-      models: process.env.AI_MODELS,
-      provider: process.env.AI_PROVIDER,
-      temperature: process.env.AI_TEMPERATURE,
-      maxTokens: process.env.AI_MAX_TOKENS,
-      anthropic: {
-        apiKey: process.env.ANTHROPIC_API_KEY,
-        baseUrl: process.env.ANTHROPIC_BASE_URL,
-      },
-      openai: {
-        apiKey: process.env.OPENAI_API_KEY,
-        baseUrl: process.env.OPENAI_BASE_URL,
-      },
-      'github-copilot': {
-        apiKey: process.env.GITHUB_COPILOT_API_KEY,
-        baseUrl: process.env.GITHUB_COPILOT_BASE_URL,
-      },
-      'openai-compatible': {
-        apiKey: process.env.OPENAI_COMPATIBLE_API_KEY,
-        baseUrl: process.env.OPENAI_COMPATIBLE_BASE_URL,
-      },
-    },
-    webhook: {
-      mr: {
-        enabled: process.env.WEBHOOK_MR_ENABLED,
-        events: process.env.WEBHOOK_MR_EVENTS,
-        reviewDrafts: process.env.WEBHOOK_MR_REVIEW_DRAFTS,
-      },
-      push: {
-        enabled: process.env.WEBHOOK_PUSH_ENABLED,
-        branches: process.env.WEBHOOK_PUSH_BRANCHES,
-      },
-      note: {
-        enabled: process.env.WEBHOOK_NOTE_ENABLED,
-        commands: process.env.WEBHOOK_NOTE_COMMANDS,
-      },
-    },
-    review: {
-      maxFiles: process.env.REVIEW_MAX_FILES,
-      maxLinesPerFile: process.env.REVIEW_MAX_LINES_PER_FILE,
-      skipFiles: process.env.REVIEW_SKIP_FILES,
-      inlineComments: process.env.REVIEW_INLINE_COMMENTS,
-      summaryComment: process.env.REVIEW_SUMMARY_COMMENT,
-      language: process.env.REVIEW_LANGUAGE,
-      failureBehavior: process.env.REVIEW_FAILURE_BEHAVIOR,
-      failureThreshold: process.env.REVIEW_FAILURE_THRESHOLD,
-    },
-    log: {
-      level: process.env.LOG_LEVEL,
-    },
   };
-
-  return AppConfigSchema.parse(envConfig);
 }
 
 // ============================================================================
@@ -151,18 +95,22 @@ function unflattenConfig(flat: Record<string, unknown>): Record<string, unknown>
 }
 
 /**
- * 合并数据库配置和环境变量配置
- * 数据库配置优先
+ * 合并数据库配置和系统环境变量配置
+ * 系统级配置（port、host）从环境变量读取
+ * 业务配置从数据库读取
  */
-export function mergeConfig(dbConfig: Record<string, unknown>, envConfig: AppConfig): AppConfig {
-  const flatEnvConfig = flattenConfig(envConfig);
-  const merged: Record<string, unknown> = { ...flatEnvConfig };
+export function mergeConfig(dbConfig: Record<string, unknown>, systemConfig: Partial<AppConfig>): AppConfig {
+  // 将扁平化的数据库配置转换为嵌套结构
+  const nestedDbConfig = unflattenConfig(dbConfig);
 
-  for (const [key, value] of Object.entries(dbConfig)) {
-    merged[key] = value;
-  }
+  // 合并配置
+  const merged: Record<string, unknown> = {
+    ...nestedDbConfig,
+    ...systemConfig,
+  };
 
-  return unflattenConfig(merged) as AppConfig;
+  // 使用 schema 验证并填充默认值
+  return AppConfigSchema.parse(merged);
 }
 
 // ============================================================================
@@ -175,14 +123,13 @@ export function mergeConfig(dbConfig: Record<string, unknown>, envConfig: AppCon
  */
 export const getCachedConfig = unstable_cache(
   async (): Promise<AppConfig> => {
-    const envConfig = loadConfigFromEnv();
+    const systemConfig = loadSystemConfigFromEnv();
     const dbConfig = await loadConfigFromDB();
-    const merged = mergeConfig(dbConfig, envConfig);
-    // 不需要再次验证，因为 envConfig 已经通过了验证
-    return merged as AppConfig;
+    const merged = mergeConfig(dbConfig, systemConfig);
+    return merged;
   },
   ['app-config'],
-  { revalidate: 60, tags: ['config'] }
+  { tags: ['config'] }
 );
 
 /**
@@ -198,7 +145,7 @@ export async function getConfig(): Promise<AppConfig> {
  */
 export async function refreshConfig(): Promise<void> {
   const { revalidateTag } = await import('next/cache');
-  revalidateTag('config', 'force-cache');
+  revalidateTag('config', '');
 }
 
 // ============================================================================
@@ -211,10 +158,13 @@ export async function refreshConfig(): Promise<void> {
 export async function setConfigValue(key: string, value: unknown): Promise<void> {
   const db = getDb();
 
-  await db.insert(settings).values({ key, value: value as unknown[] })
+  // 将值转换为字符串存储（让 Zod schema 负责转换回原始类型）
+  const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+
+  await db.insert(settings).values({ key, value: stringValue })
     .onConflictDoUpdate({
       target: settings.key,
-      set: { value: value as unknown[], updatedAt: new Date() },
+      set: { value: stringValue, updatedAt: new Date() },
     });
 
   // 刷新缓存
@@ -237,10 +187,13 @@ export async function setConfigValues(values: Record<string, unknown>): Promise<
   const db = getDb();
 
   for (const [key, value] of Object.entries(values)) {
-    await db.insert(settings).values({ key, value: value as unknown[] })
+    // 将值转换为字符串存储（让 Zod schema 负责转换回原始类型）
+    const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+
+    await db.insert(settings).values({ key, value: stringValue })
       .onConflictDoUpdate({
         target: settings.key,
-        set: { value: value as unknown[], updatedAt: new Date() },
+        set: { value: stringValue, updatedAt: new Date() },
       });
   }
 

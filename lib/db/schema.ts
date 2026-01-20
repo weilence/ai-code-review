@@ -93,7 +93,7 @@ export const webhooks = sqliteTable('webhooks', {
 export const settings = sqliteTable('settings', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   key: text('key').notNull().unique(),
-  value: text('value', { mode: 'json' }).notNull(),
+  value: text('value').notNull(),
   description: text('description'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),

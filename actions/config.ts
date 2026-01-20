@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidateTag } from 'next/cache';
+import { revalidateTag, revalidatePath } from 'next/cache';
 import { getDb, settings, reviews, webhooks } from '@/lib/db';
 import { getConfig, setConfigValue, setConfigValues, deleteConfigValue } from '@/lib/features/config';
 import { createLogger } from '@/lib/utils/logger';
@@ -26,13 +26,7 @@ export async function getAllSettings() {
 
     return {
       success: true,
-      config: {
-        gitlab: config.gitlab,
-        ai: config.ai,
-        webhook: config.webhook,
-        review: config.review,
-        log: config.log,
-      },
+      config, // 返回完整配置，包括 port 和 host
       dbSettings,
     };
   } catch (error) {
@@ -84,7 +78,7 @@ export async function updateSetting(key: string, value: unknown) {
     await setConfigValue(key, value);
 
     // 刷新配置缓存
-    revalidateTag('config', 'force-cache');
+    revalidateTag('config', '');
 
     logger.info({ key }, 'Setting updated');
 
@@ -106,9 +100,12 @@ export async function updateSettings(values: Record<string, unknown>) {
     await setConfigValues(values);
 
     // 刷新配置缓存
-    revalidateTag('config', 'force-cache');
+    revalidateTag('config', '');
 
-    logger.info({ keys: Object.keys(values) }, 'Settings updated');
+    // 刷新设置页面
+    revalidatePath('/settings');
+
+    logger.info({ keys: Object.keys(values) }, 'Settings updated successfully');
 
     return {
       success: true,
@@ -128,7 +125,7 @@ export async function deleteSetting(key: string) {
     await deleteConfigValue(key);
 
     // 刷新配置缓存
-    revalidateTag('config', 'force-cache');
+    revalidateTag('config', '');
 
     logger.info({ key }, 'Setting deleted');
 
@@ -157,7 +154,7 @@ export async function resetSettingsToDefaults() {
     await db.delete(settings);
 
     // 刷新配置缓存
-    revalidateTag('config', 'force-cache');
+    revalidateTag('config', '');
 
     logger.info('Settings reset to defaults');
 
@@ -217,7 +214,7 @@ export async function importSettings(dbSettings: Record<string, unknown>) {
     await setConfigValues(dbSettings);
 
     // 刷新配置缓存
-    revalidateTag('config', 'force-cache');
+    revalidateTag('config', '');
 
     logger.info({ keys: Object.keys(dbSettings) }, 'Settings imported');
 
