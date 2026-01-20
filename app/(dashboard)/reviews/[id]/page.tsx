@@ -27,10 +27,11 @@ function StatusBadge({ status }: { status: string }) {
 export default async function ReviewDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const id = Number(params.id);
-  const reviewResult = await getReview(id);
+  const { id } = await params;
+  const reviewId = Number(id);
+  const reviewResult = await getReview(reviewId);
 
   if (!reviewResult.success || !reviewResult.data) {
     notFound();
@@ -38,10 +39,10 @@ export default async function ReviewDetailPage({
 
   const review = reviewResult.data;
 
-  const resultsResult = await getReviewResults(id);
+  const resultsResult = await getReviewResults(reviewId);
   const results = resultsResult.success ? resultsResult.data : null;
 
-  const errorsResult = await getReviewErrors(id);
+  const errorsResult = await getReviewErrors(reviewId);
   const errors = errorsResult.success && errorsResult.data ? errorsResult.data : [];
 
   return (
@@ -75,7 +76,7 @@ export default async function ReviewDetailPage({
         {review.status === 'failed' && (
           <form action={async () => {
             'use server';
-            await retryReview(id);
+            await retryReview(reviewId);
           }}>
             <button
               type="submit"

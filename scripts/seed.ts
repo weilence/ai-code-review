@@ -6,9 +6,8 @@
  * 用法：
  *   bun run db:seed          # 填充种子数据
  */
-
-import Database from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { Database } from 'bun:sqlite';
+import { drizzle } from 'drizzle-orm/bun-sqlite';
 import * as schema from '@/lib/db/schema';
 import { getDatabasePath } from '@/lib/db/path';
 import fs from 'fs';
@@ -22,17 +21,17 @@ async function seedConfigData(db: ReturnType<typeof drizzle<typeof schema>>) {
   const configEntries = [
     {
       key: 'gitlab.url',
-      value: null,
+      value: '',
       description: 'GitLab 实例 URL（例如：https://gitlab.com）',
     },
     {
       key: 'gitlab.token',
-      value: null,
+      value: '',
       description: 'GitLab 个人访问令牌',
     },
     {
       key: 'gitlab.webhookSecret',
-      value: null,
+      value: '',
       description: 'GitLab Webhook 验证密钥',
     },
     {
@@ -121,9 +120,11 @@ async function seed() {
   const sqlite = new Database(databasePath);
 
   // 优化 SQLite 性能
-  sqlite.pragma('journal_mode = WAL');
-  sqlite.pragma('foreign_keys = ON');
-  sqlite.pragma('synchronous = NORMAL');
+  sqlite.exec(`
+    PRAGMA journal_mode = WAL;
+    PRAGMA foreign_keys = ON;
+    PRAGMA synchronous = NORMAL;
+  `);
 
   const db = drizzle(sqlite, { schema });
 

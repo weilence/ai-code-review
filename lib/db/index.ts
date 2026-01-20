@@ -1,5 +1,5 @@
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/bun-sqlite';
+import { Database } from 'bun:sqlite';
 import * as schema from './schema';
 import { getDatabasePath, ensureDataDir } from './path';
 
@@ -21,9 +21,11 @@ export function getDb() {
     const sqlite = new Database(databasePath);
 
     // 优化 SQLite 性能
-    sqlite.pragma('journal_mode = WAL');
-    sqlite.pragma('foreign_keys = ON');
-    sqlite.pragma('synchronous = NORMAL');
+    sqlite.exec(`
+      PRAGMA journal_mode = WAL;
+      PRAGMA foreign_keys = ON;
+      PRAGMA synchronous = NORMAL;
+    `);
 
     db = drizzle(sqlite, { schema });
   }
@@ -37,7 +39,7 @@ export function getDb() {
 export function resetDb() {
   if (db) {
     // Type assertion to access internal Drizzle property
-    const client = (db as unknown as { readonly __client: Database.Database }).__client;
+    const client = (db as unknown as { readonly __client: Database }).__client;
     client.close();
     db = null;
   }

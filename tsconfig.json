@@ -34,7 +34,10 @@
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": true,
     // 允许合成默认导入
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "types": [
+      "bun-types"
+    ]
   },
   "include": [
     "next-env.d.ts",
