@@ -31,9 +31,18 @@ export class GitLabClient {
   private api: InstanceType<typeof Gitlab>;
 
   constructor(config: GitLabConfig) {
+    const host = config.url.replace(/\/$/, '');
+    const token = config.token;
+
+    logger.debug({
+      host,
+      hasToken: !!token,
+      tokenPrefix: token ? token.substring(0, 10) : 'none',
+    }, 'Initializing GitLab client');
+
     this.api = new Gitlab({
-      host: config.url.replace(/\/$/, ''),
-      token: config.token,
+      host,
+      token,
     });
   }
 
@@ -193,5 +202,40 @@ export class GitLabClient {
       description: options?.description,
       targetUrl: options?.targetUrl,
     });
+  }
+
+  /**
+   * 通过项目路径获取项目信息
+   * @param projectPath - 项目路径，例如 "wei.luo/scripts-tool" 或 "namespace/project"
+   * @returns 项目信息，如果未找到则返回 null
+   */
+  async getProjectByPath(
+    projectPath: string
+  ): Promise<{ id: number; path_with_namespace: string; name: string } | null> {
+    try {
+      logger.debug({ projectPath }, 'Fetching project by path');
+
+      // @gitbeaker/rest 会自动进行 URL 编码，不需要手动编码
+      const project = await this.api.Projects.show(projectPath);
+
+      return {
+        id: project.id as number,
+        path_with_namespace: project.path_with_namespace as string,
+        name: project.name as string,
+      };
+    } catch (error: any) {
+      // 详细的错误日志
+      logger.error({
+        projectPath,
+        errorMessage: error.message,
+        errorName: error.name,
+        causeDescription: error.cause?.description,
+        causeResponse: error.cause?.response,
+        responseUrl: error.cause?.response?.url,
+        responseStatus: error.cause?.response?.status,
+      }, 'Failed to fetch project from GitLab');
+
+      return null;
+    }
   }
 }

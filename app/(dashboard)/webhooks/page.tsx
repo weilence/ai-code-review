@@ -2,6 +2,7 @@ import { desc } from 'drizzle-orm';
 import { getDb, webhooks } from '@/lib/db';
 import { cn } from '@/lib/utils';
 import { CheckCircle2, Clock } from 'lucide-react';
+import { PayloadViewer } from '@/components/webhooks/payload-viewer';
 
 export default async function WebhooksPage() {
   const db = getDb();
@@ -80,17 +81,7 @@ export default async function WebhooksPage() {
 
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">Payload</p>
-                    <button
-                      onClick={() => {
-                        const payload = webhook.payload as Record<string, unknown>;
-                        const formatted = JSON.stringify(payload, null, 2);
-                        // 简单的显示方式，实际项目中可能需要模态框
-                        alert(formatted);
-                      }}
-                      className="mt-1 text-sm text-blue-500 hover:underline"
-                    >
-                      查看详情
-                    </button>
+                    <PayloadViewer payload={webhook.payload} />
                   </div>
                 </div>
               );

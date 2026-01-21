@@ -23,7 +23,7 @@ export { AppConfigSchema } from './schema';
 // Re-export types from schema
 export type {
   AppConfig,
-  AIProviderConfig,
+  AIModelConfig,
   Language,
   AIConfig,
   GitLabConfig,
@@ -34,7 +34,6 @@ export type {
 // Re-export types from types/config
 export type {
   AppConfig as AppConfigType,
-  AIProviderConfig as AIProviderConfigType,
   ReviewRulesConfig,
   WebhookConfig,
   LogConfig,

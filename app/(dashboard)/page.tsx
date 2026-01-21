@@ -88,9 +88,10 @@ export default async function DashboardPage() {
             </div>
           ) : (
             stats.recentReviews.map((review) => (
-              <div
+              <Link
                 key={review.id}
-                className="flex items-center justify-between p-6 hover:bg-muted/50"
+                href={`/reviews/${review.id}`}
+                className="flex items-center justify-between p-6 hover:bg-muted/50 transition-colors"
               >
                 <div className="flex-1">
                   <p className="font-medium">{review.mrTitle}</p>
@@ -123,7 +124,7 @@ export default async function DashboardPage() {
                     </p>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))
           )}
         </div>

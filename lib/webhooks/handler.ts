@@ -53,6 +53,23 @@ export async function handleWebhook(deps: {
     // Parse body
     const body = await deps.request.json() as GitLabWebhook;
 
+    // Validate required webhook fields
+    if (!body.object_kind) {
+      logger.warn({ body }, 'Invalid webhook: missing object_kind');
+      return {
+        success: false,
+        message: 'Invalid webhook payload: missing object_kind field',
+      };
+    }
+
+    if (!body.project || !body.project.id) {
+      logger.warn({ body }, 'Invalid webhook: missing project.id');
+      return {
+        success: false,
+        message: 'Invalid webhook payload: missing project information',
+      };
+    }
+
     // Map GitLab object_kind to database eventType
     const dbEventType = GITLAB_OBJECT_KIND_MAP[body.object_kind] || 'mr';
 

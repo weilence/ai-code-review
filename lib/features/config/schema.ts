@@ -1,15 +1,53 @@
 import { z } from 'zod';
 
 // ============================================================================
-// AI Provider Config
+// AI Model Config
 // ============================================================================
 
-const AIProviderConfigSchema = z.object({
+/**
+ * 单个 AI 模型的配置
+ * 参考 models.dev 的格式，使用 provider:model-id 作为唯一标识
+ */
+const AIModelConfigSchema = z.object({
+  // 提供商（从 model id 中解析，但也支持显式指定）
+  provider: z.string().default('anthropic'),
+
+  // API 认证
   apiKey: z.string().optional(),
   baseUrl: z.string().optional(),
+
+  // 模型参数
+  temperature: z.coerce.number().min(0).max(2).optional(),
+  maxTokens: z.coerce.number().positive().optional(),
 });
 
-export type AIProviderConfig = z.infer<typeof AIProviderConfigSchema>;
+export type AIModelConfig = z.infer<typeof AIModelConfigSchema>;
+
+/**
+ * AI 模型配置的 Zod schema
+ * 支持从数据库加载的 JSON 字符串或对象
+ */
+const AIModelsSchema = z
+  .union([
+    // 从数据库加载时可能是 JSON 字符串
+    z.string().transform((str, ctx) => {
+      try {
+        return JSON.parse(str);
+      } catch (e) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Invalid JSON format for ai.models',
+        });
+        return z.NEVER;
+      }
+    }),
+    // 或者已经是对象
+    z.record(z.string(), AIModelConfigSchema),
+  ])
+  .transform((val) => {
+    // 确保最终返回的是正确的对象格式
+    return val as Record<string, AIModelConfig>;
+  });
 
 // ============================================================================
 // Helper Schemas
@@ -47,16 +85,19 @@ export const AppConfigSchema = z.object({
 
   // AI config
   ai: z.object({
-    models: z.string().default('anthropic:claude-sonnet-4-5').transform(s => s.split(',').map(x => x.trim()).filter(Boolean)),
-    provider: z.string().optional(),
-    temperature: z.coerce.number().optional(),
-    maxTokens: z.coerce.number().positive().optional(),
-    anthropic: AIProviderConfigSchema.optional(),
-    openai: AIProviderConfigSchema.optional(),
-    'github-copilot': AIProviderConfigSchema.optional(),
-    'openai-compatible': AIProviderConfigSchema.optional(),
+    // 模型配置字典：key 是 "provider:model-id"，value 是模型配置
+    // 例如：{ "anthropic:claude-sonnet-4-5": { provider: "anthropic", apiKey: "...", temperature: 0.7 } }
+    models: AIModelsSchema.default({
+      'anthropic:claude-sonnet-4-5': {
+        provider: 'anthropic',
+      },
+    }),
   }).default({
-    models: ['anthropic:claude-sonnet-4-5'],
+    models: {
+      'anthropic:claude-sonnet-4-5': {
+        provider: 'anthropic',
+      },
+    },
   }),
 
   // Webhook config

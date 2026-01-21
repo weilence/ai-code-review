@@ -10,30 +10,57 @@ import type {
 } from '@ai-sdk/provider';
 import { createProviderRegistry, wrapLanguageModel } from 'ai';
 import type { AIConfig } from '@/lib/features/config';
+import type { AIModelConfig } from '@/lib/features/config/schema';
 import { createLogger } from '@/lib/utils/logger';
 import { createGitHubCopilot, type CopilotTokenStorage } from './github-copilot';
 
 const logger = createLogger('ai-registry');
 
+/**
+ * 从模型配置中提取指定 provider 的配置
+ * 使用第一个匹配该 provider 的模型配置
+ */
+function getProviderConfig(
+  models: Record<string, AIModelConfig>,
+  providerName: string
+): { apiKey?: string; baseUrl?: string } | undefined {
+  for (const config of Object.values(models)) {
+    if (config.provider === providerName) {
+      return {
+        apiKey: config.apiKey,
+        baseUrl: config.baseUrl,
+      };
+    }
+  }
+  return undefined;
+}
+
 function createRegistry(config: AIConfig, copilotTokenStorage: CopilotTokenStorage) {
   logger.info('Creating AI provider registry');
 
+  // 从新的模型配置中提取每个 provider 的配置
+  const anthropicConfig = getProviderConfig(config.models, 'anthropic');
+  const openaiConfig = getProviderConfig(config.models, 'openai');
+  const openaiCompatibleConfig = getProviderConfig(config.models, 'openai-compatible');
+  const githubCopilotConfig = getProviderConfig(config.models, 'github-copilot');
+
   return createProviderRegistry({
     'openai': createOpenAI({
-      apiKey: config.openai?.apiKey,
-      baseURL: config.openai?.baseUrl,
+      apiKey: openaiConfig?.apiKey,
+      baseURL: openaiConfig?.baseUrl,
     }),
     'anthropic': createAnthropic({
-      apiKey: config.anthropic?.apiKey,
-      baseURL: config.anthropic?.baseUrl,
+      apiKey: anthropicConfig?.apiKey,
+      baseURL: anthropicConfig?.baseUrl,
     }),
     'openai-compatible': createOpenAI({
-      apiKey: config['openai-compatible']?.apiKey,
-      baseURL: config['openai-compatible']?.baseUrl ?? '',
+      apiKey: openaiCompatibleConfig?.apiKey,
+      baseURL: openaiCompatibleConfig?.baseUrl ?? '',
     }),
     'github-copilot': createGitHubCopilot(
       {
-        ...config['github-copilot'],
+        apiKey: githubCopilotConfig?.apiKey,
+        baseURL: githubCopilotConfig?.baseUrl,
         headers: {
           'User-Agent': 'GitHubCopilotChat/0.35.0',
           'Editor-Version': 'vscode/1.107.0',
@@ -54,55 +81,7 @@ export class AICodeReviewRegistry implements Registry {
   }
 
   languageModel(id: LanguageModelId): LanguageModelV3 {
-    const model = this.registry.languageModel(id) as LanguageModelV3 & {
-      supportsStructuredOutputs?: boolean
-    };
-
-    return wrapLanguageModel({
-      model,
-      middleware: [
-        {
-          specificationVersion: 'v3',
-          transformParams: ({ params }) => {
-            if (model.supportsStructuredOutputs && params.responseFormat?.type === 'json') {
-              if (params.responseFormat.schema) {
-                const schema = params.responseFormat.schema;
-
-                delete schema.$schema;
-                delete schema.additionalProperties;
-
-                let userIndex = params.prompt.findIndex(p => p.role === 'user');
-
-                if (userIndex === -1) {
-                  userIndex = params.prompt.length;
-                }
-
-                params.prompt.splice(userIndex, 0, {
-                  role: 'system',
-                  content: `Respond in the following JSON Schema format:\n${JSON.stringify(schema)}`,
-                });
-
-                delete params.responseFormat.schema;
-              }
-            }
-
-            const provider = id.split(':')[0];
-
-            if (provider && model.modelId.startsWith('glm-4.7')) {
-              params.providerOptions = {
-                [provider]: {
-                  thinking: {
-                    type: 'disabled',
-                  },
-                },
-              };
-            }
-
-            return Promise.resolve(params);
-          },
-        },
-      ],
-    });
+    return this.registry.languageModel(id);
   }
 
   embeddingModel(id: EmbeddingModelId): EmbeddingModelV3 {

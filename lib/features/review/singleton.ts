@@ -32,7 +32,8 @@ export async function getReviewEngine(): Promise<ReviewEngine> {
     const gitlabClient = new GitLabClient(config.gitlab);
 
     // Get the first model or use default
-    const modelId = (config.ai.models[0] as `anthropic:${string}` | `openai:${string}` | `github-copilot:${string}` | `openai-compatible:${string}`) || DEFAULT_AI_MODEL as `anthropic:${string}` | `openai:${string}` | `github-copilot:${string}` | `openai-compatible:${string}`;
+    const firstModelId = Object.keys(config.ai.models)[0];
+    const modelId = (firstModelId as `anthropic:${string}` | `openai:${string}` | `github-copilot:${string}` | `openai-compatible:${string}`) || DEFAULT_AI_MODEL as `anthropic:${string}` | `openai:${string}` | `github-copilot:${string}` | `openai-compatible:${string}`;
 
     // Create review engine
     reviewEngineInstance = new ReviewEngine(

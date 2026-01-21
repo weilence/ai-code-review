@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateSettings } from '@/actions/config';
 import type { AppConfig } from '@/lib/features/config/schema';
+import type { AIModelConfig } from '@/lib/features/config/schema';
 import { cn } from '@/lib/utils';
 import { Loader2, Save, CheckCircle2, XCircle } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
+import { AIModelsForm } from './ai-models-form';
 
 interface SettingsFormProps {
   config: AppConfig;
@@ -24,14 +26,10 @@ export function SettingsForm({ config }: SettingsFormProps) {
   const [gitlabToken, setGitlabToken] = useState(config.gitlab.token || '');
   const [gitlabWebhookSecret, setGitlabWebhookSecret] = useState(config.gitlab.webhookSecret || '');
 
-  // AI 配置
-  const [aiModels, setAiModels] = useState(
-    Array.isArray(config.ai.models) ? config.ai.models.join(', ') : config.ai.models || ''
+  // AI 配置 - 模型配置字典
+  const [aiModels, setAiModels] = useState<Record<string, AIModelConfig>>(
+    config.ai.models || {}
   );
-  const [aiTemperature, setAiTemperature] = useState(config.ai.temperature?.toString() || '');
-  const [aiMaxTokens, setAiMaxTokens] = useState(config.ai.maxTokens?.toString() || '');
-  const [anthropicApiKey, setAnthropicApiKey] = useState(config.ai.anthropic?.apiKey || '');
-  const [openaiApiKey, setOpenaiApiKey] = useState(config.ai.openai?.apiKey || '');
 
   // Webhook 配置
   const [webhookMrEnabled, setWebhookMrEnabled] = useState(config.webhook.mr.enabled ?? true);
@@ -72,12 +70,8 @@ export function SettingsForm({ config }: SettingsFormProps) {
         'gitlab.token': gitlabToken.trim(),
         'gitlab.webhookSecret': gitlabWebhookSecret.trim(),
 
-        // AI 配置
-        'ai.models': aiModels.trim() || 'anthropic:claude-sonnet-4-5',
-        'ai.temperature': aiTemperature ? Number(aiTemperature) : undefined,
-        'ai.maxTokens': aiMaxTokens ? Number(aiMaxTokens) : undefined,
-        'ai.anthropic.apiKey': anthropicApiKey.trim(),
-        'ai.openai.apiKey': openaiApiKey.trim(),
+        // AI 配置 - 将模型配置字典转换为 JSON 存储
+        'ai.models': JSON.stringify(aiModels),
 
         // Webhook 配置 - 保存为字符串，让 Zod schema 负责转换
         'webhook.mr.enabled': webhookMrEnabled ? 'true' : 'false',
@@ -166,82 +160,10 @@ export function SettingsForm({ config }: SettingsFormProps) {
       {/* AI Configuration */}
       <div className="rounded-xl border bg-card p-6 shadow-sm">
         <h2 className="mb-4 text-xl font-semibold">AI 配置</h2>
-        <div className="space-y-4">
-          <div>
-            <label htmlFor="ai-models" className="block text-sm text-muted-foreground">
-              模型（逗号分隔）
-            </label>
-            <input
-              id="ai-models"
-              type="text"
-              value={aiModels}
-              onChange={(e) => setAiModels(e.target.value)}
-              placeholder="anthropic:claude-sonnet-4-5, openai:gpt-4"
-              className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm font-mono"
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              格式: provider:model-id，支持多个模型用逗号分隔
-            </p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label htmlFor="ai-temperature" className="block text-sm text-muted-foreground">
-                Temperature
-              </label>
-              <input
-                id="ai-temperature"
-                type="number"
-                step="0.1"
-                min="0"
-                max="2"
-                value={aiTemperature}
-                onChange={(e) => setAiTemperature(e.target.value)}
-                placeholder="0.7"
-                className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label htmlFor="ai-max-tokens" className="block text-sm text-muted-foreground">
-                Max Tokens
-              </label>
-              <input
-                id="ai-max-tokens"
-                type="number"
-                min="1"
-                value={aiMaxTokens}
-                onChange={(e) => setAiMaxTokens(e.target.value)}
-                placeholder="8192"
-                className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
-              />
-            </div>
-          </div>
-          <div>
-            <label htmlFor="anthropic-api-key" className="block text-sm text-muted-foreground">
-              Anthropic API Key
-            </label>
-            <input
-              id="anthropic-api-key"
-              type="password"
-              value={anthropicApiKey}
-              onChange={(e) => setAnthropicApiKey(e.target.value)}
-              placeholder="sk-ant-xxxxxxxxxxxxxx"
-              className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm font-mono"
-            />
-          </div>
-          <div>
-            <label htmlFor="openai-api-key" className="block text-sm text-muted-foreground">
-              OpenAI API Key
-            </label>
-            <input
-              id="openai-api-key"
-              type="password"
-              value={openaiApiKey}
-              onChange={(e) => setOpenaiApiKey(e.target.value)}
-              placeholder="sk-xxxxxxxxxxxxxx"
-              className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm font-mono"
-            />
-          </div>
-        </div>
+        <AIModelsForm
+          initialModels={config.ai.models || {}}
+          onChange={(models) => setAiModels(models)}
+        />
       </div>
 
       {/* Webhook Configuration */}

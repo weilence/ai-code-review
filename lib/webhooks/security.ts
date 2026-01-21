@@ -11,9 +11,18 @@ export interface VerifyOptions {
 /**
  * Verify GitLab webhook signature
  * GitLab uses X-Gitlab-Token header for webhook verification
+ *
+ * Note: If no secret is configured, verification is skipped (useful for development)
  */
 export function verifyWebhookSignature(options: VerifyOptions): void {
   const { secret, token } = options;
+
+  // 如果没有配置 secret，跳过验证（开发模式）
+  if (!secret || secret.trim() === '') {
+    logger.warn('Webhook secret not configured, skipping verification');
+    logger.warn('This is not recommended for production environments');
+    return;
+  }
 
   if (!token) {
     logger.warn('Webhook received without token');

@@ -2,14 +2,9 @@ import { NextResponse } from 'next/server';
 import { getConfig } from '@/lib/features/config';
 import { handleWebhook } from '@/lib/webhooks/handler';
 import { getReviewEngine } from '@/lib/services';
-import { createRequestLogger } from '@/lib/utils/logger';
 
 export async function POST(request: Request) {
-  const logger = await createRequestLogger('webhook-api', request);
-
   try {
-    logger.info('Webhook request received');
-
     // 获取配置和服务
     const config = await getConfig();
     const reviewEngine = await getReviewEngine();
@@ -28,8 +23,6 @@ export async function POST(request: Request) {
     return NextResponse.json(result, { status: statusCode });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-
-    logger.error({ error: errorMessage }, 'Webhook processing failed');
 
     return NextResponse.json(
       { success: false, message: errorMessage },

@@ -76,39 +76,6 @@ export function createLogger(name: string, additionalContext?: Record<string, un
   });
 }
 
-/**
- * 创建带有请求上下文的日志器
- * 用于 Server Components 和 API Routes
- */
-export async function createRequestLogger(
-  name: string,
-  request?: Request
-): Promise<Logger> {
-  const context: Record<string, unknown> = { name };
-
-  // 如果有 Request 对象，提取请求信息
-  if (request) {
-    const headers = request.headers;
-    context.requestId = headers.get('x-request-id') || crypto.randomUUID();
-    context.userAgent = headers.get('user-agent');
-    context.ip = headers.get('x-forwarded-for') || headers.get('x-real-ip') || 'unknown';
-    context.method = request.method;
-    context.url = request.url;
-  }
-
-  return logger.child(context);
-}
-
-/**
- * 获取或创建请求 ID
- */
-export function getRequestId(request?: Request): string {
-  if (request) {
-    return request.headers.get('x-request-id') || crypto.randomUUID();
-  }
-  return crypto.randomUUID();
-}
-
 // ============================================================================
 // Log Level Helpers
 // ============================================================================

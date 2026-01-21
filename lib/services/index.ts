@@ -25,7 +25,8 @@ export async function getReviewEngine(): Promise<ReviewEngine> {
     const gitlabClient = new GitLabClient(config.gitlab);
 
     // 创建 review engine
-    const modelId = config.ai.models[0] as 'anthropic:claude-sonnet-4-5';
+    const firstModelId = Object.keys(config.ai.models)[0];
+    const modelId = (firstModelId as 'anthropic:claude-sonnet-4-5') || 'anthropic:claude-sonnet-4-5';
     reviewEngine = new ReviewEngine(
       aiRegistry,
       modelId,
