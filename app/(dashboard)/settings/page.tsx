@@ -1,9 +1,6 @@
 import { getAllSettings } from '@/actions/config';
 import { SettingsForm } from '@/components/settings/settings-form';
 
-// 禁用页面缓存，确保每次都获取最新配置
-export const dynamic = 'force-dynamic';
-
 export default async function SettingsPage() {
   const settingsResult = await getAllSettings();
 

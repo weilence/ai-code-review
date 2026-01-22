@@ -25,9 +25,6 @@ import {
   getNoteTypeLabel,
 } from '@/lib/webhooks/extract-info';
 
-// 强制动态渲染，避免构建时查询数据库
-export const dynamic = 'force-dynamic';
-
 export default async function WebhooksPage({ searchParams }: PageProps) {
   // 从 URL 获取分页参数
   const params = await searchParams || {};

@@ -2,6 +2,9 @@ import type { ReactNode } from 'react';
 import Header from '@/components/layout/header';
 import Sidebar from '@/components/layout/sidebar';
 
+// 禁用页面缓存，确保每次都获取最新配置
+export const dynamic = 'force-dynamic';
+
 export default function DashboardLayout({
   children,
 }: {
