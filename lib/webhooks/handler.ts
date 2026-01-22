@@ -85,7 +85,6 @@ export async function handleWebhook(deps: {
       objectKind: body.object_kind,
       payload: body,
       projectId: body.project.id.toString(),
-      processed: false,
     }).returning();
 
     const webhookEventId = webhookRecord[0]?.id;

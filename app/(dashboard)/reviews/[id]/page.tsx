@@ -4,6 +4,7 @@ import { getReview, getReviewResults, getReviewErrors, retryReview } from '@/act
 import { cn } from '@/lib/utils';
 import { CheckCircle2, Clock, XCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
+import { ClientDateTime } from '@/components/ui/client-date-time';
 
 function StatusBadge({ status }: { status: string }) {
   const config = {
@@ -107,7 +108,7 @@ export default async function ReviewDetailPage({
         <div className="rounded-xl border bg-card p-4 shadow-sm">
           <p className="text-sm text-muted-foreground">创建时间</p>
           <p className="mt-2 text-sm">
-            {review.createdAt ? new Date(review.createdAt).toLocaleString('zh-CN') : '-'}
+            {review.createdAt ? <ClientDateTime date={review.createdAt} mode="absolute" /> : '-'}
           </p>
         </div>
 
@@ -239,7 +240,7 @@ export default async function ReviewDetailPage({
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-red-900">{error.errorType}</span>
                   <span className="text-xs text-red-600">
-                    {error.createdAt ? new Date(error.createdAt).toLocaleString('zh-CN') : '-'}
+                    {error.createdAt ? <ClientDateTime date={error.createdAt} mode="absolute" /> : '-'}
                   </span>
                 </div>
                 <p className="mt-2 text-sm text-red-800">{error.errorMessage}</p>

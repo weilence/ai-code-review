@@ -1,5 +1,6 @@
 import { getReviewStatistics } from '@/actions/review';
 import { Activity, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { ClientDateTime } from '@/components/ui/client-date-time';
 import Link from 'next/link';
 
 export default async function DashboardPage() {
@@ -120,7 +121,7 @@ export default async function DashboardPage() {
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">时间</p>
                     <p className="mt-1 text-sm">
-                      {review.createdAt ? new Date(review.createdAt).toLocaleString('zh-CN') : '-'}
+                      {review.createdAt ? <ClientDateTime date={review.createdAt} mode="absolute" /> : '-'}
                     </p>
                   </div>
                 </div>

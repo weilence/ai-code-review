@@ -15,12 +15,11 @@ import {
 } from 'lucide-react';
 import { PayloadViewer } from '@/components/webhooks/payload-viewer';
 import { Pagination } from '@/components/ui/pagination';
+import { ClientDateTime } from '@/components/ui/client-date-time';
 import type { PageProps } from '@/types/next';
 import { getNumberParam } from '@/types/next';
 import {
   extractWebhookInfo,
-  formatRelativeTime,
-  formatAbsoluteTime,
   getMrActionLabel,
   getNoteTypeLabel,
 } from '@/lib/webhooks/extract-info';
@@ -60,6 +59,17 @@ export default async function WebhooksPage({ searchParams }: PageProps) {
     failed: { label: '失败', color: 'text-red-500', icon: XCircle },
   };
 
+  // 获取统一的处理状态配置（基于 review 状态）
+  function getProcessingStatus(webhook: typeof webhooksList[0]) {
+    // 没有 review → 未处理
+    if (!webhook.review) {
+      return { label: '未处理', color: 'text-yellow-500', icon: Clock };
+    }
+    // 有 review → 使用 review 的状态
+    const reviewStatus = webhook.review.status as keyof typeof reviewStatusConfig;
+    return reviewStatusConfig[reviewStatus] || reviewStatusConfig.pending;
+  }
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -98,18 +108,17 @@ export default async function WebhooksPage({ searchParams }: PageProps) {
                       {config?.label}
                     </span>
 
-                    {/* 处理状态 */}
-                    {webhook.processed ? (
-                      <span className="flex items-center gap-1 text-xs text-green-500 shrink-0">
-                        <CheckCircle2 className="h-3 w-3" />
-                        已处理
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-xs text-yellow-500 shrink-0">
-                        <Clock className="h-3 w-3" />
-                        未处理
-                      </span>
-                    )}
+                    {/* 处理状态（统一基于 review 状态） */}
+                    {(() => {
+                      const statusConfig = getProcessingStatus(webhook);
+                      const StatusIcon = statusConfig.icon;
+                      return (
+                        <span className={cn('flex items-center gap-1 text-xs shrink-0', statusConfig.color)}>
+                          <StatusIcon className="h-3 w-3" />
+                          {statusConfig.label}
+                        </span>
+                      );
+                    })()}
 
                     {/* 项目路径 */}
                     <a
@@ -241,28 +250,16 @@ export default async function WebhooksPage({ searchParams }: PageProps) {
                   <div className="flex items-center gap-6 shrink-0">
                     {/* 时间信息 */}
                     <div className="text-sm">
-                      <span className="text-muted-foreground" title={formatAbsoluteTime(webhook.createdAt)}>
-                        {formatRelativeTime(webhook.createdAt)}
-                      </span>
+                      <ClientDateTime date={webhook.createdAt} mode="relative" className="text-muted-foreground" />
                     </div>
 
                     {/* 审查关联 */}
                     {webhook.review && (
                       <Link
                         href={`/reviews/${webhook.review.id}`}
-                        className="flex items-center gap-2 text-sm group"
+                        className="flex items-center gap-2 text-sm group hover:text-foreground transition-colors"
                       >
                         <span className="text-muted-foreground">审查 #{webhook.review.id}</span>
-                        {(() => {
-                          const reviewConfig = reviewStatusConfig[webhook.review.status as keyof typeof reviewStatusConfig];
-                          const ReviewIcon = reviewConfig?.icon || Clock;
-                          return (
-                            <span className={cn('flex items-center gap-1 text-xs', reviewConfig?.color)}>
-                              <ReviewIcon className="h-3 w-3" />
-                              {reviewConfig?.label}
-                            </span>
-                          );
-                        })()}
                         {webhook.review.completedAt && webhook.review.startedAt && (
                           <span className="text-xs text-muted-foreground">
                             {Math.round((webhook.review.completedAt.getTime() - webhook.review.startedAt.getTime()) / 1000)}s

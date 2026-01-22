@@ -11,3 +11,4 @@ export {
   DialogTitle,
   DialogDescription,
 } from './dialog';
+export { ClientDateTime } from './client-date-time';

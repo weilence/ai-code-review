@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getReviews } from '@/actions/review';
 import { cn } from '@/lib/utils';
 import { CheckCircle2, Clock, XCircle, AlertCircle } from 'lucide-react';
+import { ClientDateTime } from '@/components/ui/client-date-time';
 import type { PageProps } from '@/types/next';
 import { getStringParam } from '@/types/next';
 
@@ -124,7 +125,7 @@ export default async function ReviewsPage({
                       <div className="text-right">
                         <p className="text-sm text-muted-foreground">创建时间</p>
                         <p className="mt-1 text-sm">
-                          {review.createdAt ? new Date(review.createdAt).toLocaleString('zh-CN') : '-'}
+                          {review.createdAt ? <ClientDateTime date={review.createdAt} mode="absolute" /> : '-'}
                         </p>
                       </div>
 

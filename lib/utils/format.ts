@@ -1,11 +1,4 @@
 /**
- * Format a date to locale string
- */
-export function formatDate(date: Date | string | number): string {
-  return new Date(date).toLocaleString('zh-CN');
-}
-
-/**
  * Format a number with commas
  */
 export function formatNumber(num: number): string {

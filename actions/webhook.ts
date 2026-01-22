@@ -18,7 +18,6 @@ export interface WebhookWithReview {
   payload: GitLabWebhook;
   projectId: string | null;
   mrIid: number | null;
-  processed: boolean;
   createdAt: Date;
   // 关联的审查信息
   review?: {
@@ -35,21 +34,17 @@ export interface WebhookWithReview {
  */
 export async function getWebhooks(options?: {
   objectKind?: string;
-  processed?: boolean;
   limit?: number;
   offset?: number;
 }) {
   try {
     const db = getDb();
-    const { objectKind, processed, limit = 50, offset = 0 } = options || {};
+    const { objectKind, limit = 50, offset = 0 } = options || {};
 
     // 构建查询条件
     const conditions = [];
     if (objectKind) {
       conditions.push(eq(webhooks.objectKind, objectKind));
-    }
-    if (processed !== undefined) {
-      conditions.push(eq(webhooks.processed, processed));
     }
 
     const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;

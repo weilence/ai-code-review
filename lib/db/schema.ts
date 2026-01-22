@@ -79,7 +79,6 @@ export const webhooks = sqliteTable('webhooks', {
   payload: text('payload', { mode: 'json' }).notNull().$type<GitLabWebhook>(),
   projectId: text('project_id'),
   mrIid: integer('mr_iid'),
-  processed: integer('processed', { mode: 'boolean' }).notNull().default(false),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 }, (table) => [
   index('idx_webhooks_object_kind').on(table.objectKind),
