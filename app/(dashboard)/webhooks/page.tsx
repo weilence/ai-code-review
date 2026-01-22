@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { getWebhooks } from '@/actions/webhook';
+import { revalidatePath } from 'next/cache';
+import { getWebhooks, deleteWebhook, clearAllWebhooks } from '@/actions/webhook';
 import { cn } from '@/lib/utils';
 import {
   CheckCircle2,
@@ -12,10 +13,13 @@ import {
   User,
   GitMerge,
   ExternalLink,
+  Trash2,
 } from 'lucide-react';
 import { PayloadViewer } from '@/components/webhooks/payload-viewer';
 import { Pagination } from '@/components/ui/pagination';
 import { ClientDateTime } from '@/components/ui/client-date-time';
+import { buttonVariants } from '@/components/ui/button';
+import { DeleteButton } from '@/components/ui/delete-button';
 import type { PageProps } from '@/types/next';
 import { getNumberParam } from '@/types/next';
 import {
@@ -74,11 +78,33 @@ export default async function WebhooksPage({ searchParams }: PageProps) {
     <div className="space-y-6">
       {/* Page Header */}
       <div className="flex items-center justify-between">
-        <div>
+        <div suppressHydrationWarning>
           <h1 className="text-3xl font-bold">Webhook 监控</h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground" >
             共 {total} 条日志
           </p>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          <form
+            action={async () => {
+              'use server';
+              await clearAllWebhooks();
+              revalidatePath('/webhooks');
+            }}
+          >
+            <button
+              type="submit"
+              className={cn(
+                buttonVariants({ variant: 'outline', size: 'sm' }),
+                'gap-2 text-red-600 hover:text-red-700',
+              )}
+            >
+              <Trash2 className="h-4 w-4" />
+              清空所有
+            </button>
+          </form>
         </div>
       </div>
 
@@ -98,7 +124,7 @@ export default async function WebhooksPage({ searchParams }: PageProps) {
               return (
                 <div
                   key={webhook.id}
-                  className="flex items-center justify-between gap-4 p-6 hover:bg-muted/30 transition-colors"
+                  className="group flex items-center justify-between gap-4 p-6 hover:bg-muted/30 transition-colors"
                 >
                   {/* 左侧：主要信息 */}
                   <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -246,7 +272,7 @@ export default async function WebhooksPage({ searchParams }: PageProps) {
                     )}
                   </div>
 
-                  {/* 右侧：时间 + 审查关联 + Payload */}
+                  {/* 右侧：时间 + 审查关联 + Payload + 删除按钮 */}
                   <div className="flex items-center gap-6 shrink-0">
                     {/* 时间信息 */}
                     <div className="text-sm">
@@ -270,6 +296,17 @@ export default async function WebhooksPage({ searchParams }: PageProps) {
 
                     {/* Payload */}
                     <PayloadViewer payload={webhook.payload} />
+
+                    {/* 删除按钮 */}
+                    <DeleteButton
+                      action={async () => {
+                        'use server';
+                        return await deleteWebhook(webhook.id);
+                      }}
+                      confirmMessage="确定要删除这条 webhook 日志吗？"
+                      redirectTo="/webhooks"
+                      className="opacity-0 group-hover:opacity-100"
+                    />
                   </div>
                 </div>
               );

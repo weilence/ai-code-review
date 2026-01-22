@@ -1,31 +1,25 @@
-CREATE TABLE `review_errors` (
+CREATE TABLE `review_logs` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`review_id` integer NOT NULL,
-	`error_type` text NOT NULL,
-	`error_message` text NOT NULL,
+	`log_type` text NOT NULL,
+	`inline_comments` text,
+	`summary` text,
+	`provider_used` text,
+	`model_used` text,
+	`duration_ms` integer,
+	`inline_comments_posted` integer,
+	`summary_posted` integer,
+	`error_type` text,
+	`error_message` text,
 	`error_stack` text,
-	`retryable` integer DEFAULT true NOT NULL,
+	`retryable` integer DEFAULT true,
 	`created_at` integer NOT NULL,
 	FOREIGN KEY (`review_id`) REFERENCES `reviews`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE INDEX `idx_review_errors_review_id` ON `review_errors` (`review_id`);--> statement-breakpoint
-CREATE TABLE `review_results` (
-	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`review_id` integer NOT NULL,
-	`inline_comments` text NOT NULL,
-	`summary` text NOT NULL,
-	`provider_used` text NOT NULL,
-	`model_used` text NOT NULL,
-	`duration_ms` integer NOT NULL,
-	`inline_comments_posted` integer NOT NULL,
-	`summary_posted` integer NOT NULL,
-	`created_at` integer NOT NULL,
-	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`review_id`) REFERENCES `reviews`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `idx_review_results_review_id` ON `review_results` (`review_id`);--> statement-breakpoint
+CREATE INDEX `idx_review_logs_review_id` ON `review_logs` (`review_id`);--> statement-breakpoint
+CREATE INDEX `idx_review_logs_review_id_type` ON `review_logs` (`review_id`,`log_type`);--> statement-breakpoint
+CREATE INDEX `idx_review_logs_created_at` ON `review_logs` (`created_at`);--> statement-breakpoint
 CREATE TABLE `reviews` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`project_id` text NOT NULL,
@@ -46,7 +40,7 @@ CREATE TABLE `reviews` (
 	`last_error_message` text,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`webhook_event_id`) REFERENCES `webhooks`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`webhook_event_id`) REFERENCES `webhooks`(`id`) ON UPDATE no action ON DELETE set null
 );
 --> statement-breakpoint
 CREATE INDEX `idx_reviews_project_mr` ON `reviews` (`project_id`,`mr_iid`);--> statement-breakpoint
@@ -65,14 +59,12 @@ CREATE TABLE `settings` (
 CREATE UNIQUE INDEX `settings_key_unique` ON `settings` (`key`);--> statement-breakpoint
 CREATE TABLE `webhooks` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`event_type` text NOT NULL,
 	`object_kind` text NOT NULL,
 	`payload` text NOT NULL,
 	`project_id` text,
 	`mr_iid` integer,
-	`processed` integer DEFAULT false NOT NULL,
 	`created_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `idx_webhooks_event_type` ON `webhooks` (`event_type`);--> statement-breakpoint
+CREATE INDEX `idx_webhooks_object_kind` ON `webhooks` (`object_kind`);--> statement-breakpoint
 CREATE INDEX `idx_webhooks_created_at` ON `webhooks` (`created_at`);

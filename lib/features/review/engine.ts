@@ -2,14 +2,14 @@ import { eq } from 'drizzle-orm';
 import parseDiff from 'parse-diff';
 import type { LanguageModelId, Registry } from '@/lib/features/ai';
 import type { ReviewConfig } from '@/lib/features/config';
-import { getDb, reviews, reviewResults, reviewErrors } from '@/lib/db';
-import type { MergeRequestChanges } from '@/types/gitlab';
+import { getDb, reviews, reviewLogs } from '@/lib/db';
 import { createLogger } from '@/lib/utils/logger';
 import { CodeReviewAnalyzer, type AnalysisResult } from './analyzer';
 import { formatSummaryComment, formatInlineComment, formatPendingComment, formatErrorComment, type ReviewContext, AI_COMMENT_MARKER } from './prompts';
 import type { InlineComment, Summary, Severity } from './schema';
 import { filterReviewableFiles, ParsedChunk, ParsedFile } from '../gitlab/review-files';
 import { GitLabClient } from '../gitlab/client';
+import { MergeRequestChanges } from '@/types/gitlab';
 
 const logger = createLogger('review-engine');
 
@@ -20,6 +20,7 @@ export interface ReviewOptions {
   triggeredBy?: 'webhook' | 'manual' | 'command';
   triggerEvent?: string;
   webhookEventId?: number;
+  reviewId?: number; // 可选：用于重试现有审查记录
 }
 
 export interface ReviewResult {
@@ -42,39 +43,50 @@ export class ReviewEngine {
   }
 
   async reviewMergeRequest(options: ReviewOptions): Promise<ReviewResult> {
-    const { projectId, mrIid, triggeredBy = 'webhook', triggerEvent, webhookEventId } = options;
+    const { projectId, mrIid, triggeredBy = 'webhook', triggerEvent, webhookEventId, reviewId: existingReviewId } = options;
     const errors: string[] = [];
 
-    logger.info({ projectId, mrIid }, 'Starting merge request review');
+    logger.info({ projectId, mrIid, existingReviewId }, 'Starting merge request review');
 
     const mrChanges = await this.gitlabClient.getMergeRequestChanges(projectId, mrIid);
-    const commitSha = mrChanges.diff_refs.head_sha;
+    const commitSha = mrChanges.diffRefs.headSha;
 
     const db = getDb();
-    const reviewRecord = await db.insert(reviews).values({
-      projectId: projectId.toString(),
-      projectPath: mrChanges.web_url.split('/').slice(3, 5).join('/'),
-      mrIid,
-      mrTitle: mrChanges.title,
-      mrAuthor: mrChanges.author.username,
-      mrDescription: mrChanges.description || null,
-      sourceBranch: mrChanges.source_branch,
-      targetBranch: mrChanges.target_branch,
-      status: 'running',
-      triggeredBy,
-      triggerEvent,
-      webhookEventId,
-      startedAt: new Date(),
-      retryCount: 0,
-    }).returning();
 
-    const insertedReview = reviewRecord[0];
+    // 获取或创建 review 记录
+    let reviewId: number;
+    if (existingReviewId) {
+      // 重试模式：使用现有记录
+      reviewId = existingReviewId;
+      logger.info({ reviewId }, 'Reusing existing review record for retry');
+    } else {
+      // 新建模式：创建新记录
+      const reviewRecord = await db.insert(reviews).values({
+        projectId: projectId.toString(),
+        projectPath: mrChanges.webUrl.split('/').slice(3, 5).join('/'),
+        mrIid,
+        mrTitle: mrChanges.title,
+        mrAuthor: mrChanges.author.username,
+        mrDescription: mrChanges.description || null,
+        sourceBranch: mrChanges.sourceBranch,
+        targetBranch: mrChanges.targetBranch,
+        status: 'running',
+        triggeredBy,
+        triggerEvent,
+        webhookEventId,
+        startedAt: new Date(),
+        retryCount: 0,
+      }).returning();
 
-    if (!insertedReview) {
-      throw new Error('Failed to create review record');
+      const insertedReview = reviewRecord[0];
+
+      if (!insertedReview) {
+        throw new Error('Failed to create review record');
+      }
+
+      reviewId = insertedReview.id;
     }
 
-    const reviewId = insertedReview.id;
     const { summaryNoteId } = await this.cleanupOldComments(projectId, mrIid);
 
     let statusNoteId: number | null = summaryNoteId;
@@ -127,12 +139,12 @@ export class ReviewEngine {
     }
 
     const context: ReviewContext = {
-      projectName: mrChanges.web_url.split('/').slice(3, 5).join('/'),
+      projectName: mrChanges.webUrl.split('/').slice(3, 5).join('/'),
       mrTitle: mrChanges.title,
       mrDescription: mrChanges.description || undefined,
       author: mrChanges.author.username,
-      sourceBranch: mrChanges.source_branch,
-      targetBranch: mrChanges.target_branch,
+      sourceBranch: mrChanges.sourceBranch,
+      targetBranch: mrChanges.targetBranch,
     };
 
     let analysis: AnalysisResult;
@@ -149,8 +161,9 @@ export class ReviewEngine {
 
       logger.error({ error, projectId, mrIid }, 'AI analysis failed');
 
-      await db.insert(reviewErrors).values({
+      await db.insert(reviewLogs).values({
         reviewId,
+        logType: 'error',
         errorType: error instanceof Error ? error.constructor.name : 'Error',
         errorMessage,
         errorStack: error instanceof Error ? error.stack : null,
@@ -192,8 +205,9 @@ export class ReviewEngine {
       }
     }
 
-    await db.insert(reviewResults).values({
+    await db.insert(reviewLogs).values({
       reviewId,
+      logType: 'result',
       inlineComments: analysis.review.inlineComments,
       summary: analysis.review.summary,
       providerUsed: analysis.providerUsed,
@@ -343,11 +357,11 @@ export class ReviewEngine {
           : [];
 
         return {
-          path: change.new_path,
-          oldPath: change.renamed_file ? change.old_path : undefined,
-          isNew: change.new_file,
-          isDeleted: change.deleted_file,
-          isRenamed: change.renamed_file,
+          path: change.newPath,
+          oldPath: change.renamedFile ? change.oldPath : undefined,
+          isNew: change.newFile,
+          isDeleted: change.deletedFile,
+          isRenamed: change.renamedFile,
           chunks,
         };
       });
@@ -379,9 +393,9 @@ export class ReviewEngine {
       comment.file,
       comment.line,
       {
-        base_sha: mrChanges.diff_refs.base_sha,
-        head_sha: mrChanges.diff_refs.head_sha,
-        start_sha: mrChanges.diff_refs.start_sha,
+        baseSha: mrChanges.diffRefs.baseSha,
+        headSha: mrChanges.diffRefs.headSha,
+        startSha: mrChanges.diffRefs.startSha,
       },
       true,
       file.oldPath,
@@ -403,6 +417,7 @@ export class ReviewEngine {
     const discussions = await this.gitlabClient.getDiscussions(projectId, mrIid);
 
     for (const discussion of discussions) {
+      if (!discussion.notes) continue;
       const firstNote = discussion.notes[0];
 
       if (!firstNote?.body.includes(AI_COMMENT_MARKER)) {

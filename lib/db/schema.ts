@@ -21,7 +21,7 @@ export const reviews = sqliteTable('reviews', {
   completedAt: integer('completed_at', { mode: 'timestamp' }),
   triggeredBy: text('triggered_by', { enum: ['webhook', 'manual', 'command'] }).notNull(),
   triggerEvent: text('trigger_event'),
-  webhookEventId: integer('webhook_event_id').references(() => webhooks.id),
+  webhookEventId: integer('webhook_event_id').references(() => webhooks.id, { onDelete: 'set null' }),
   retryCount: integer('retry_count').notNull().default(0),
   lastErrorMessage: text('last_error_message'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
@@ -34,39 +34,37 @@ export const reviews = sqliteTable('reviews', {
 ]);
 
 // ============================================================================
-// Review Results 表
+// Review Logs 表（合并 review_results 和 review_errors）
 // ============================================================================
 
-export const reviewResults = sqliteTable('review_results', {
+export const reviewLogs = sqliteTable('review_logs', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   reviewId: integer('review_id').notNull().references(() => reviews.id, { onDelete: 'cascade' }),
-  inlineComments: text('inline_comments', { mode: 'json' }).notNull().$type<InlineComment[]>(),
-  summary: text('summary', { mode: 'json' }).notNull().$type<Summary>(),
-  providerUsed: text('provider_used').notNull(),
-  modelUsed: text('model_used').notNull(),
-  durationMs: integer('duration_ms').notNull(),
-  inlineCommentsPosted: integer('inline_comments_posted').notNull(),
-  summaryPosted: integer('summary_posted').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
-}, (table) => [
-  index('idx_review_results_review_id').on(table.reviewId),
-]);
 
-// ============================================================================
-// Review Errors 表
-// ============================================================================
+  // 日志类型：成功结果或错误
+  logType: text('log_type', { enum: ['result', 'error'] }).notNull(),
 
-export const reviewErrors = sqliteTable('review_errors', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  reviewId: integer('review_id').notNull().references(() => reviews.id, { onDelete: 'cascade' }),
-  errorType: text('error_type').notNull(),
-  errorMessage: text('error_message').notNull(),
+  // ===== 结果字段（logType='result' 时使用） =====
+  inlineComments: text('inline_comments', { mode: 'json' }).$type<InlineComment[]>(),
+  summary: text('summary', { mode: 'json' }).$type<Summary>(),
+  providerUsed: text('provider_used'),
+  modelUsed: text('model_used'),
+  durationMs: integer('duration_ms'),
+  inlineCommentsPosted: integer('inline_comments_posted'),
+  summaryPosted: integer('summary_posted'),
+
+  // ===== 错误字段（logType='error' 时使用） =====
+  errorType: text('error_type'),
+  errorMessage: text('error_message'),
   errorStack: text('error_stack'),
-  retryable: integer('retryable', { mode: 'boolean' }).notNull().default(true),
+  retryable: integer('retryable', { mode: 'boolean' }).default(true),
+
+  // 通用字段
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 }, (table) => [
-  index('idx_review_errors_review_id').on(table.reviewId),
+  index('idx_review_logs_review_id').on(table.reviewId),
+  index('idx_review_logs_review_id_type').on(table.reviewId, table.logType),
+  index('idx_review_logs_created_at').on(table.createdAt),
 ]);
 
 // ============================================================================
@@ -105,11 +103,8 @@ export const settings = sqliteTable('settings', {
 export type Review = typeof reviews.$inferSelect;
 export type NewReview = typeof reviews.$inferInsert;
 
-export type ReviewResult = typeof reviewResults.$inferSelect;
-export type NewReviewResult = typeof reviewResults.$inferInsert;
-
-export type ReviewError = typeof reviewErrors.$inferSelect;
-export type NewReviewError = typeof reviewErrors.$inferInsert;
+export type ReviewLog = typeof reviewLogs.$inferSelect;
+export type NewReviewLog = typeof reviewLogs.$inferInsert;
 
 export type Webhook = typeof webhooks.$inferSelect;
 export type NewWebhook = typeof webhooks.$inferInsert;

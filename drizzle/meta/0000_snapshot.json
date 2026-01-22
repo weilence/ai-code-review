@@ -1,11 +1,11 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "e506fa56-839c-4dd7-9b75-13af0a79ed91",
+  "id": "db257944-f469-45ed-a002-085c43933844",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
-    "review_errors": {
-      "name": "review_errors",
+    "review_logs": {
+      "name": "review_logs",
       "columns": {
         "id": {
           "name": "id",
@@ -21,18 +21,74 @@
           "notNull": true,
           "autoincrement": false
         },
+        "log_type": {
+          "name": "log_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "inline_comments": {
+          "name": "inline_comments",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "summary": {
+          "name": "summary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "provider_used": {
+          "name": "provider_used",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "model_used": {
+          "name": "model_used",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "duration_ms": {
+          "name": "duration_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "inline_comments_posted": {
+          "name": "inline_comments_posted",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "summary_posted": {
+          "name": "summary_posted",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "error_type": {
           "name": "error_type",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "error_message": {
           "name": "error_message",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "error_stack": {
@@ -46,7 +102,7 @@
           "name": "retryable",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false,
           "default": true
         },
@@ -59,127 +115,33 @@
         }
       },
       "indexes": {
-        "idx_review_errors_review_id": {
-          "name": "idx_review_errors_review_id",
+        "idx_review_logs_review_id": {
+          "name": "idx_review_logs_review_id",
           "columns": [
             "review_id"
+          ],
+          "isUnique": false
+        },
+        "idx_review_logs_review_id_type": {
+          "name": "idx_review_logs_review_id_type",
+          "columns": [
+            "review_id",
+            "log_type"
+          ],
+          "isUnique": false
+        },
+        "idx_review_logs_created_at": {
+          "name": "idx_review_logs_created_at",
+          "columns": [
+            "created_at"
           ],
           "isUnique": false
         }
       },
       "foreignKeys": {
-        "review_errors_review_id_reviews_id_fk": {
-          "name": "review_errors_review_id_reviews_id_fk",
-          "tableFrom": "review_errors",
-          "tableTo": "reviews",
-          "columnsFrom": [
-            "review_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "review_results": {
-      "name": "review_results",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "review_id": {
-          "name": "review_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "inline_comments": {
-          "name": "inline_comments",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "summary": {
-          "name": "summary",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "provider_used": {
-          "name": "provider_used",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "model_used": {
-          "name": "model_used",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "duration_ms": {
-          "name": "duration_ms",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "inline_comments_posted": {
-          "name": "inline_comments_posted",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "summary_posted": {
-          "name": "summary_posted",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_review_results_review_id": {
-          "name": "idx_review_results_review_id",
-          "columns": [
-            "review_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "review_results_review_id_reviews_id_fk": {
-          "name": "review_results_review_id_reviews_id_fk",
-          "tableFrom": "review_results",
+        "review_logs_review_id_reviews_id_fk": {
+          "name": "review_logs_review_id_reviews_id_fk",
+          "tableFrom": "review_logs",
           "tableTo": "reviews",
           "columnsFrom": [
             "review_id"
@@ -376,7 +338,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -454,13 +416,6 @@
           "notNull": true,
           "autoincrement": true
         },
-        "event_type": {
-          "name": "event_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "object_kind": {
           "name": "object_kind",
           "type": "text",
@@ -489,14 +444,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "processed": {
-          "name": "processed",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -506,10 +453,10 @@
         }
       },
       "indexes": {
-        "idx_webhooks_event_type": {
-          "name": "idx_webhooks_event_type",
+        "idx_webhooks_object_kind": {
+          "name": "idx_webhooks_object_kind",
           "columns": [
-            "event_type"
+            "object_kind"
           ],
           "isUnique": false
         },

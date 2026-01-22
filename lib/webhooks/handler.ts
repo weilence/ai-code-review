@@ -1,5 +1,6 @@
 import type { WebhookEventsConfig } from '@/lib/features/config';
 import type { ReviewEngine } from '@/lib/features/review';
+import { AI_COMMENT_MARKER } from '@/lib/features/review/prompts';
 import { getDb, webhooks } from '@/lib/db';
 import { createLogger } from '@/lib/utils/logger';
 import { handleMergeRequestEvent } from './events/merge-request';
@@ -15,6 +16,21 @@ import {
 } from './types';
 
 const logger = createLogger('webhook-handler');
+
+/**
+ * Check if a webhook should be ignored before processing
+ * Returns the reason to ignore, or undefined if not ignored
+ */
+function shouldIgnoreWebhook(webhook: GitLabWebhook): string | undefined {
+  // Ignore AI-generated comments to prevent database clutter
+  if (isNoteWebhook(webhook)) {
+    const { object_attributes } = webhook;
+    if (object_attributes.note?.includes(AI_COMMENT_MARKER)) {
+      return 'AI-generated comment';
+    }
+  }
+  return undefined;
+}
 
 export interface WebhookResponse {
   success: boolean;
@@ -75,6 +91,18 @@ export async function handleWebhook(deps: {
       return {
         success: false,
         message: `Unsupported object_kind: ${body.object_kind}`,
+        handled: false,
+      };
+    }
+
+    // Check if webhook should be ignored before logging to database
+    const ignoreReason = shouldIgnoreWebhook(body);
+    if (ignoreReason) {
+      logger.debug({ requestId, ignoreReason }, 'Ignoring webhook before database logging');
+      return {
+        success: true,
+        message: `Webhook ignored: ${ignoreReason}`,
+        eventType: body.object_kind,
         handled: false,
       };
     }

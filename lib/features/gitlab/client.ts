@@ -1,40 +1,15 @@
-import { Gitlab } from '@gitbeaker/rest';
-import { z } from 'zod';
+import { DiscussionNotePositionOptions, DiscussionSchema, Gitlab } from '@gitbeaker/rest';
 import type { GitLabConfig } from '@/lib/features/config';
 import { createLogger } from '@/lib/utils/logger';
 import type {
+  DeepCamelize,
   MergeRequestChanges,
-  GitLabNote,
-  GitLabDiscussion,
-  InlineCommentPosition,
 } from '@/types/gitlab';
-import {
-  GitLabNoteSchema,
-  GitLabDiscussionSchema,
-  validateGitLabResponse,
-} from './schemas';
 
 const logger = createLogger('gitlab-client');
 
-/**
- * GitLab API 创建讨论的参数类型
- * 与 @gitbeaker/rest 的类型定义对齐（使用 camelCase）
- */
-interface GitlabDiscussionOptions {
-  position?: {
-    positionType: 'text';
-    baseSha: string;
-    headSha: string;
-    startSha: string;
-    oldPath: string;
-    newPath: string;
-    oldLine?: string;
-    newLine?: string;
-  };
-}
-
 export class GitLabClient {
-  private api: InstanceType<typeof Gitlab>;
+  private api: InstanceType<typeof Gitlab<true>>;
 
   constructor(config: GitLabConfig) {
     const host = config.url.replace(/\/$/, '');
@@ -49,6 +24,7 @@ export class GitLabClient {
     this.api = new Gitlab({
       host,
       token,
+      camelize: true,
     });
   }
 
@@ -59,11 +35,9 @@ export class GitLabClient {
     const mr = await this.api.MergeRequests.show(projectId, mrIid);
     const diffs = await this.api.MergeRequests.allDiffs(projectId, mrIid);
 
-    // 使用 gitbeaker 的类型，直接组合 MR 和 diffs
     return {
       ...mr,
       changes: diffs,
-      overflow: undefined,
     } as MergeRequestChanges;
   }
 
@@ -71,46 +45,35 @@ export class GitLabClient {
     projectId: number | string,
     mrIid: number,
     body: string,
-  ): Promise<GitLabNote> {
+  ) {
     logger.debug({ projectId, mrIid, bodyLength: body.length }, 'Posting note');
 
     const note = await this.api.MergeRequestNotes.create(projectId, mrIid, body);
 
-    return validateGitLabResponse(GitLabNoteSchema, note, 'postNote');
+    return note
   }
 
   async postDiscussion(
     projectId: number | string,
     mrIid: number,
     body: string,
-    position: InlineCommentPosition,
-  ): Promise<GitLabDiscussion> {
+    position: DiscussionNotePositionOptions,
+  ) {
     logger.debug(
       { projectId, mrIid, position },
       'Posting discussion with position',
     );
 
-    const discussionOptions: GitlabDiscussionOptions = {
-      position: {
-        positionType: 'text',
-        baseSha: position.base_sha,
-        headSha: position.head_sha,
-        startSha: position.start_sha,
-        oldPath: position.old_path ?? position.new_path,
-        newPath: position.new_path,
-        oldLine: position.old_line ? String(position.old_line) : undefined,
-        newLine: position.new_line ? String(position.new_line) : undefined,
-      },
-    };
-
     const discussion = await this.api.MergeRequestDiscussions.create(
       projectId,
       mrIid,
       body,
-      discussionOptions,
+      {
+        position,
+      },
     );
 
-    return validateGitLabResponse(GitLabDiscussionSchema, discussion, 'postDiscussion');
+    return discussion;
   }
 
   async postInlineComment(
@@ -119,23 +82,23 @@ export class GitLabClient {
     body: string,
     filePath: string,
     lineNumber: number,
-    diffRefs: { base_sha: string; head_sha: string; start_sha: string },
+    diffRefs: { baseSha: string; headSha: string; startSha: string },
     isNewLine = true,
     oldPath?: string,
-  ): Promise<GitLabDiscussion> {
-    const position: InlineCommentPosition = {
-      position_type: 'text',
-      base_sha: diffRefs.base_sha,
-      head_sha: diffRefs.head_sha,
-      start_sha: diffRefs.start_sha,
-      new_path: filePath,
-      old_path: oldPath ?? filePath,
-    };
+  ) {
+    const position: DiscussionNotePositionOptions = {
+      positionType: 'text',
+      baseSha: diffRefs.baseSha,
+      headSha: diffRefs.headSha,
+      startSha: diffRefs.startSha,
+      newPath: filePath,
+      oldPath: oldPath ?? filePath,
+    }
 
     if (isNewLine) {
-      position.new_line = lineNumber;
+      position.newLine = lineNumber.toString();
     } else {
-      position.old_line = lineNumber;
+      position.oldLine = lineNumber.toString();
     }
 
     return this.postDiscussion(projectId, mrIid, body, position);
@@ -144,10 +107,10 @@ export class GitLabClient {
   async getDiscussions(
     projectId: number | string,
     mrIid: number,
-  ): Promise<GitLabDiscussion[]> {
+  ) {
     const discussions = await this.api.MergeRequestDiscussions.all(projectId, mrIid);
 
-    return z.array(GitLabDiscussionSchema).parse(discussions);
+    return discussions as DeepCamelize<DiscussionSchema>[]
   }
 
   async deleteDiscussionNote(
@@ -164,10 +127,10 @@ export class GitLabClient {
   async getNotes(
     projectId: number | string,
     mrIid: number,
-  ): Promise<GitLabNote[]> {
+  ) {
     const notes = await this.api.MergeRequestNotes.all(projectId, mrIid);
 
-    return z.array(GitLabNoteSchema).parse(notes);
+    return notes;
   }
 
   async updateNote(
@@ -175,12 +138,12 @@ export class GitLabClient {
     mrIid: number,
     noteId: number,
     body: string,
-  ): Promise<GitLabNote> {
+  ) {
     logger.debug({ projectId, mrIid, noteId }, 'Updating note');
 
     const note = await this.api.MergeRequestNotes.edit(projectId, mrIid, noteId, { body });
 
-    return validateGitLabResponse(GitLabNoteSchema, note, 'updateNote');
+    return note
   }
 
   async setCommitStatus(
@@ -217,9 +180,9 @@ export class GitLabClient {
       const project = await this.api.Projects.show(projectPath);
 
       return {
-        id: project.id as number,
+        id: project.id,
         path_with_namespace: project.path_with_namespace as string,
-        name: project.name as string,
+        name: project.name,
       };
     } catch (error) {
       // 详细的错误日志

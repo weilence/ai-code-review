@@ -49,7 +49,10 @@ export function ClientDateTime({
 }: ClientDateTimeProps) {
   const [mounted, setMounted] = useState(false);
 
+  // 检测客户端挂载，避免水合不匹配（React 官方推荐模式）
   useEffect(() => {
+    // https://react.dev/reference/react/useEffect#displaying-different-content-on-the-server-and-the-client
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 

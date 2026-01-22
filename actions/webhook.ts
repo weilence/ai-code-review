@@ -133,3 +133,51 @@ export async function getWebhookById(id: number) {
     return null;
   }
 }
+
+/**
+ * 删除单个 Webhook 日志
+ */
+export async function deleteWebhook(id: number) {
+  try {
+    const db = getDb();
+
+    await db.delete(webhooks).where(eq(webhooks.id, id));
+
+    console.log('Webhook deleted:', id);
+
+    return {
+      success: true,
+      message: 'Webhook deleted successfully',
+    };
+  } catch (error) {
+    console.error('Failed to delete webhook:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to delete webhook',
+    };
+  }
+}
+
+/**
+ * 清空所有 Webhook 日志
+ */
+export async function clearAllWebhooks() {
+  try {
+    const db = getDb();
+
+    await db.delete(webhooks);
+
+    console.log('All webhooks cleared');
+
+    return {
+      success: true,
+      message: 'All webhooks cleared successfully',
+    };
+  } catch (error) {
+    console.error('Failed to clear all webhooks:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to clear all webhooks',
+    };
+  }
+}

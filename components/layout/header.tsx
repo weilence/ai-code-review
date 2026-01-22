@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Bot } from 'lucide-react';
 
 export default function Header() {
   return (
@@ -6,9 +7,7 @@ export default function Header() {
       <div className="flex items-center gap-4">
         <Link href="/" className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <Bot className="h-5 w-5" />
           </div>
           <span className="text-lg font-semibold">AI Code Review</span>
         </Link>
@@ -16,7 +15,7 @@ export default function Header() {
 
       <div className="flex items-center gap-4">
         <a
-          href="https://github.com"
+          href="https://github.com/weilence/ai-code-review"
           target="_blank"
           rel="noopener noreferrer"
           className="text-muted-foreground hover:text-foreground"

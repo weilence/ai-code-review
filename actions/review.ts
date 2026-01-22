@@ -1,7 +1,7 @@
 'use server';
 
 import { eq, desc, count, and } from 'drizzle-orm';
-import { getDb, reviews, reviewResults, reviewErrors } from '@/lib/db';
+import { getDb, reviews, reviewLogs } from '@/lib/db';
 import { getReviewEngine } from '@/lib/features/review/singleton';
 import { createLogger } from '@/lib/utils/logger';
 
@@ -108,53 +108,82 @@ export async function getReviewByMr(projectId: string, mrIid: number) {
 }
 
 // ============================================================================
-// Get Review Results
+// Get Review Logs
 // ============================================================================
 
-export async function getReviewResults(reviewId: number) {
+export async function getReviewLogs(reviewId: number) {
   try {
     const db = getDb();
 
-    const results = await db
+    const logs = await db
       .select()
-      .from(reviewResults)
-      .where(eq(reviewResults.reviewId, reviewId))
-      .limit(1);
+      .from(reviewLogs)
+      .where(eq(reviewLogs.reviewId, reviewId))
+      .orderBy(desc(reviewLogs.createdAt));
 
     return {
       success: true,
-      data: results[0] || null,
+      data: logs,
     };
   } catch (error) {
-    logger.error({ error, reviewId }, 'Failed to get review results');
+    logger.error({ error, reviewId }, 'Failed to get review logs');
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to get review results',
+      error: error instanceof Error ? error.message : 'Failed to get review logs',
     };
   }
 }
 
-export async function getReviewErrors(reviewId: number) {
-  try {
-    const db = getDb();
+// ============================================================================
+// Legacy Helper Functions (向后兼容)
+// ============================================================================
 
-    const errors = await db
-      .select()
-      .from(reviewErrors)
-      .where(eq(reviewErrors.reviewId, reviewId))
-      .orderBy(desc(reviewErrors.createdAt));
+/**
+ * 获取最新的审查结果（向后兼容）
+ * @deprecated 使用 getReviewLogs 代替
+ */
+export async function getReviewResults(reviewId: number) {
+  const result = await getReviewLogs(reviewId);
 
+  if (!result.success || !result.data) {
     return {
-      success: true,
-      data: errors,
-    };
-  } catch (error) {
-    logger.error({ error, reviewId }, 'Failed to get review errors');
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to get review errors',
+      success: result.success,
+      error: result.error,
+      data: null,
     };
   }
+
+  // 找到最新的 result 类型日志
+  const latestResult = result.data.find(log => log.logType === 'result');
+
+  return {
+    success: true,
+    data: latestResult || null,
+  };
+}
+
+/**
+ * 获取审查错误列表（向后兼容）
+ * @deprecated 使用 getReviewLogs 代替
+ */
+export async function getReviewErrors(reviewId: number) {
+  const result = await getReviewLogs(reviewId);
+
+  if (!result.success || !result.data) {
+    return {
+      success: result.success,
+      error: result.error,
+      data: [],
+    };
+  }
+
+  // 过滤出所有 error 类型日志
+  const errors = result.data.filter(log => log.logType === 'error');
+
+  return {
+    success: true,
+    data: errors,
+  };
 }
 
 // ============================================================================
@@ -219,28 +248,43 @@ export async function retryReview(reviewId: number) {
 
     logger.info({ reviewId }, 'Retrying failed review');
 
-    const reviewEngine = await getReviewEngine();
+    // 更新状态为 running，增加重试计数
+    await db
+      .update(reviews)
+      .set({
+        status: 'running',
+        retryCount: reviewData.retryCount + 1,
+        startedAt: new Date(),
+        updatedAt: new Date(),
+        lastErrorMessage: null,
+      })
+      .where(eq(reviews.id, reviewId));
 
-    const result = await reviewEngine.reviewMergeRequest({
-      projectId: Number(reviewData.projectId),
-      mrIid: reviewData.mrIid,
-      triggeredBy: 'manual',
-    });
+    // 启动后台任务（不等待）
+    ;(async () => {
+      try {
+        const reviewEngine = await getReviewEngine();
+        await reviewEngine.reviewMergeRequest({
+          projectId: Number(reviewData.projectId),
+          mrIid: reviewData.mrIid,
+          triggeredBy: 'manual',
+          reviewId, // 传入现有 reviewId 以重用记录
+        });
+      } catch (error) {
+        logger.error({ error, reviewId }, 'Background review retry failed');
+      }
+    })();
 
+    // 立即返回成功
     return {
       success: true,
-      data: {
-        inlineCommentsPosted: result.inlineCommentsPosted,
-        summaryPosted: result.summaryPosted,
-        errors: result.errors,
-      },
-      message: 'Review retried successfully',
+      message: '审查任务已启动，正在后台执行',
     };
   } catch (error) {
-    logger.error({ error, reviewId }, 'Failed to retry review');
+    logger.error({ error, reviewId }, 'Failed to start review retry');
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to retry review',
+      error: error instanceof Error ? error.message : 'Failed to start review retry',
     };
   }
 }
@@ -317,6 +361,27 @@ export async function deleteReview(id: number) {
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to delete review',
+    };
+  }
+}
+
+export async function clearAllReviews() {
+  try {
+    const db = getDb();
+
+    await db.delete(reviews);
+
+    logger.info('All reviews cleared');
+
+    return {
+      success: true,
+      message: 'All reviews cleared successfully',
+    };
+  } catch (error) {
+    logger.error({ error }, 'Failed to clear all reviews');
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to clear all reviews',
     };
   }
 }
