@@ -1,5 +1,5 @@
 import { getConfig } from '@/lib/features/config';
-import { GitLabClient } from '@/lib/features/gitlab';
+import { GitLabClient } from './client';
 
 /**
  * GitLab Client Singleton

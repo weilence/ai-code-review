@@ -1,8 +1,13 @@
 // types/gitlab.ts
 
+import { MergeRequestChangesSchema, MergeRequestDiffSchema } from "@gitbeaker/rest";
+
 /**
- * GitLab 用户信息
+ * GitLab API 类型定义
+ * 使用 @gitbeaker/core 提供的类型，确保与 GitLab API 同步
  */
+
+// 从 gitbeaker 导入核心 GitLab API 响应类型
 export interface GitLabUser {
   id: number;
   name: string;
@@ -12,64 +17,36 @@ export interface GitLabUser {
 }
 
 /**
- * GitLab 项目信息
+ * Merge Request 变更（包含 diff 信息）
+ * 使用 gitbeaker 的 MergeRequestChangesSchema，移除 overflow 字段
+ * 并确保关键字段类型正确
  */
-export interface GitlabProject {
-  id: number;
-  name: string;
-  path_with_namespace: string;
-  web_url: string;
-}
-
-/**
- * Merge Request 基本信息
- */
-export interface MergeRequest {
-  id: number;
-  iid: number;
-  project_id: number;
-  title: string;
-  description: string;
-  state: 'opened' | 'closed' | 'merged' | 'locked';
-  source_branch: string;
-  target_branch: string;
-  author: {
-    id: number;
-    username: string;
-    name: string;
-  };
+export type MergeRequestChanges = Omit<MergeRequestChangesSchema, 'overflow'> & {
+  // 确保这些关键字段有明确的类型
   diff_refs: {
     base_sha: string;
     head_sha: string;
     start_sha: string;
   };
-  created_at: string;
-  updated_at: string;
+  changes: MergeRequestDiffSchema[];
   web_url: string;
-  draft?: boolean;
-}
-
-/**
- * Merge Request 变更 Diff
- */
-export interface MergeRequestChanges extends MergeRequest {
-  changes: FileChange[];
-  changes_count: number;
-}
+  author: {
+    id: number;
+    username: string;
+    name: string;
+  };
+  // 显式定义 gitbeaker 可能返回 unknown 的字段
+  title: string;
+  description?: string | null;
+  source_branch: string;
+  target_branch: string;
+};
 
 /**
  * 单个文件的变更
+ * 使用 gitbeaker 的 MergeRequestDiffSchema
  */
-export interface FileChange {
-  old_path: string;
-  new_path: string;
-  a_mode?: string;
-  b_mode?: string;
-  diff: string;
-  new_file: boolean;
-  renamed_file: boolean;
-  deleted_file: boolean;
-}
+export type FileChange = MergeRequestDiffSchema;
 
 /**
  * 内联评论位置

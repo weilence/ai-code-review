@@ -93,3 +93,17 @@ export async function getParam(
 
   return value
 }
+
+/**
+ * 辅助函数：从 searchParams Promise 中提取数字值
+ */
+export async function getNumberParam(
+  searchParams: Promise<Record<string, string | string[] | undefined>>,
+  key: string
+): Promise<number | undefined> {
+  const strValue = await getStringParam(searchParams, key)
+  if (!strValue) return undefined
+
+  const num = parseInt(strValue, 10)
+  return isNaN(num) ? undefined : num
+}

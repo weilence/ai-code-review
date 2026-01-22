@@ -1,8 +1,7 @@
 import type { SystemModelMessage } from 'ai';
 import type { Language } from '@/lib/features/config';
-import type { ParsedFile } from '@/lib/features/gitlab';
-import { formatDiffForPrompt } from '@/lib/features/gitlab';
 import type { InlineComment, Summary } from './schema';
+import { formatDiffForPrompt, ParsedFile } from '../gitlab/review-files';
 
 export const AI_COMMENT_MARKER = '<!-- ai-code-review-bot -->';
 

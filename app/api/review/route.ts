@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getConfig } from '@/lib/features/config';
 import { getReviewEngine } from '@/lib/features/review/singleton';
-import { GitLabClient } from '@/lib/features/gitlab';
 import { parseGitLabMRUrl } from '@/lib/utils/gitlab';
+import { GitLabClient } from '@/lib/features/gitlab/client';
 
 export async function POST(request: Request) {
   try {

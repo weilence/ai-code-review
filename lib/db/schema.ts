@@ -1,5 +1,6 @@
 import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
 import type { InlineComment, Summary } from '@/lib/features/review/schema';
+import type { GitLabWebhook } from '@/lib/webhooks/types';
 
 // ============================================================================
 // Reviews 表
@@ -25,12 +26,12 @@ export const reviews = sqliteTable('reviews', {
   lastErrorMessage: text('last_error_message'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
-}, (table) => ({
-  projectMrIdx: index('idx_reviews_project_mr').on(table.projectId, table.mrIid),
-  statusIdx: index('idx_reviews_status').on(table.status),
-  createdAtIdx: index('idx_reviews_created_at').on(table.createdAt),
-  webhookEventIdIdx: index('idx_reviews_webhook_event_id').on(table.webhookEventId),
-}));
+}, (table) => [
+  index('idx_reviews_project_mr').on(table.projectId, table.mrIid),
+  index('idx_reviews_status').on(table.status),
+  index('idx_reviews_created_at').on(table.createdAt),
+  index('idx_reviews_webhook_event_id').on(table.webhookEventId),
+]);
 
 // ============================================================================
 // Review Results 表
@@ -48,9 +49,9 @@ export const reviewResults = sqliteTable('review_results', {
   summaryPosted: integer('summary_posted').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
-}, (table) => ({
-  reviewIdIdx: index('idx_review_results_review_id').on(table.reviewId),
-}));
+}, (table) => [
+  index('idx_review_results_review_id').on(table.reviewId),
+]);
 
 // ============================================================================
 // Review Errors 表
@@ -64,9 +65,9 @@ export const reviewErrors = sqliteTable('review_errors', {
   errorStack: text('error_stack'),
   retryable: integer('retryable', { mode: 'boolean' }).notNull().default(true),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
-}, (table) => ({
-  reviewIdIdx: index('idx_review_errors_review_id').on(table.reviewId),
-}));
+}, (table) => [
+  index('idx_review_errors_review_id').on(table.reviewId),
+]);
 
 // ============================================================================
 // Webhooks 表
@@ -74,17 +75,16 @@ export const reviewErrors = sqliteTable('review_errors', {
 
 export const webhooks = sqliteTable('webhooks', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  eventType: text('event_type', { enum: ['mr', 'push', 'note'] }).notNull(),
   objectKind: text('object_kind').notNull(),
-  payload: text('payload', { mode: 'json' }).notNull(),
+  payload: text('payload', { mode: 'json' }).notNull().$type<GitLabWebhook>(),
   projectId: text('project_id'),
   mrIid: integer('mr_iid'),
   processed: integer('processed', { mode: 'boolean' }).notNull().default(false),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
-}, (table) => ({
-  eventTypeIdx: index('idx_webhooks_event_type').on(table.eventType),
-  createdAtIdx: index('idx_webhooks_created_at').on(table.createdAt),
-}));
+}, (table) => [
+  index('idx_webhooks_object_kind').on(table.objectKind),
+  index('idx_webhooks_created_at').on(table.createdAt),
+]);
 
 // ============================================================================
 // Settings 表

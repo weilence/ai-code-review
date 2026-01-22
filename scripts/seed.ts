@@ -103,11 +103,9 @@ async function seed() {
   const sqlite = new Database(databasePath);
 
   // 优化 SQLite 性能
-  sqlite.exec(`
-    PRAGMA journal_mode = WAL;
-    PRAGMA foreign_keys = ON;
-    PRAGMA synchronous = NORMAL;
-  `);
+  sqlite.run('PRAGMA journal_mode = WAL;');
+  sqlite.run('PRAGMA foreign_keys = ON;');
+  sqlite.run('PRAGMA synchronous = NORMAL;');
 
   const db = drizzle(sqlite, { schema });
 

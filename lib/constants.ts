@@ -23,8 +23,9 @@ export const DEFAULT_CONFIG = {
  * Webhook event types
  */
 export const WEBHOOK_EVENT_TYPES = {
-  MERGE_REQUEST: 'mr',
+  MERGE_REQUEST: 'merge_request',
   PUSH: 'push',
+  TAG_PUSH: 'tag_push',
   NOTE: 'note',
 } as const;
 
@@ -110,15 +111,6 @@ export type FailureBehavior = typeof FAILURE_BEHAVIOR[keyof typeof FAILURE_BEHAV
 export const FILE_LIMITS = {
   MAX_FILES: DEFAULT_CONFIG.REVIEW_MAX_FILES,
   MAX_LINES_PER_FILE: DEFAULT_CONFIG.REVIEW_MAX_LINES_PER_FILE,
-} as const;
-
-/**
- * GitLab object kind to event type mapping
- */
-export const GITLAB_OBJECT_KIND_MAP: Record<string, WebhookEventType> = {
-  merge_request: WEBHOOK_EVENT_TYPES.MERGE_REQUEST,
-  push: WEBHOOK_EVENT_TYPES.PUSH,
-  note: WEBHOOK_EVENT_TYPES.NOTE,
 } as const;
 
 /**

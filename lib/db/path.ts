@@ -53,7 +53,7 @@ export function getDatabasePath(): string {
 
   // 使用用户数据目录
   const dataDir = getUserDataDir();
-  logger.info(`Using database path in user data directory: ${dataDir}`);
+  logger.debug(`Using database path in user data directory: ${dataDir}`);
 
   return path.join(dataDir, 'ai-code-review.db');
 }

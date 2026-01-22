@@ -1,5 +1,5 @@
 import { getConfig } from '@/lib/features/config';
-import { GitLabClient } from '@/lib/features/gitlab';
+import { GitLabClient } from '@/lib/features/gitlab/client';
 import { AICodeReviewRegistry } from '@/lib/features/ai';
 import { CopilotTokenStorage } from '@/lib/features/ai/github-copilot';
 import { ReviewEngine } from '@/lib/features/review';

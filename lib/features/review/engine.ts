@@ -3,13 +3,13 @@ import parseDiff from 'parse-diff';
 import type { LanguageModelId, Registry } from '@/lib/features/ai';
 import type { ReviewConfig } from '@/lib/features/config';
 import { getDb, reviews, reviewResults, reviewErrors } from '@/lib/db';
-import type { GitLabClient } from '@/lib/features/gitlab';
-import { filterReviewableFiles, type ParsedFile, type ParsedChunk } from '@/lib/features/gitlab';
 import type { MergeRequestChanges } from '@/types/gitlab';
 import { createLogger } from '@/lib/utils/logger';
 import { CodeReviewAnalyzer, type AnalysisResult } from './analyzer';
 import { formatSummaryComment, formatInlineComment, formatPendingComment, formatErrorComment, type ReviewContext, AI_COMMENT_MARKER } from './prompts';
 import type { InlineComment, Summary, Severity } from './schema';
+import { filterReviewableFiles, ParsedChunk, ParsedFile } from '../gitlab/review-files';
+import { GitLabClient } from '../gitlab/client';
 
 const logger = createLogger('review-engine');
 

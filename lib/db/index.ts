@@ -10,6 +10,7 @@ import { getDatabasePath, ensureDataDir } from './path';
  */
 
 let db: ReturnType<typeof drizzle<typeof schema>> | null = null;
+let sqliteClient: Database | null = null;
 
 export function getDb() {
   if (!db) {
@@ -18,16 +19,14 @@ export function getDb() {
     // 确保数据目录存在
     ensureDataDir();
 
-    const sqlite = new Database(databasePath);
+    sqliteClient = new Database(databasePath);
 
     // 优化 SQLite 性能
-    sqlite.exec(`
-      PRAGMA journal_mode = WAL;
-      PRAGMA foreign_keys = ON;
-      PRAGMA synchronous = NORMAL;
-    `);
+    sqliteClient.run('PRAGMA journal_mode = WAL;');
+    sqliteClient.run('PRAGMA foreign_keys = ON;');
+    sqliteClient.run('PRAGMA synchronous = NORMAL;');
 
-    db = drizzle(sqlite, { schema });
+    db = drizzle(sqliteClient, { schema });
   }
 
   return db;
@@ -37,10 +36,9 @@ export function getDb() {
  * 重置数据库连接（主要用于测试）
  */
 export function resetDb() {
-  if (db) {
-    // Type assertion to access internal Drizzle property
-    const client = (db as unknown as { readonly __client: Database }).__client;
-    client.close();
+  if (sqliteClient) {
+    sqliteClient.close();
+    sqliteClient = null;
     db = null;
   }
 }

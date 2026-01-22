@@ -33,9 +33,9 @@ const AIModelsSchema = z
     z.string().transform((str, ctx) => {
       try {
         return JSON.parse(str);
-      } catch (e) {
+      } catch {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           message: 'Invalid JSON format for ai.models',
         });
         return z.NEVER;

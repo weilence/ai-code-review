@@ -14,6 +14,18 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "old/**",
   ]),
+  {
+    files: ['**/*.{ts,tsx}'],
+    rules: {
+      "@typescript-eslint/no-deprecated": "error",
+    },
+    // 为需要类型信息的规则提供 TypeScript 配置
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+      },
+    },
+  }
 ]);
 
 export default eslintConfig;

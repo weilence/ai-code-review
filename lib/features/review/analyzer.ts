@@ -1,10 +1,10 @@
 import { generateWithAgent } from './agent';
 import type { LanguageModelId, Registry } from '@/lib/features/ai';
 import type { Language } from '@/lib/features/config';
-import type { ParsedFile } from '@/lib/features/gitlab';
 import { createLogger } from '@/lib/utils/logger';
 import { buildSystemPrompt, buildUserPrompt, type ReviewContext } from './prompts';
 import { CodeReviewResultSchema, type CodeReviewResult } from './schema';
+import { ParsedFile } from '../gitlab/review-files';
 
 const logger = createLogger('code-analyzer');
 

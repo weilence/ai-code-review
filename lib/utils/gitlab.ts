@@ -45,7 +45,7 @@ export function parseGitLabMRUrl(url: string): {
       mrIid,
       baseUrl,
     };
-  } catch (error) {
+  } catch {
     return null;
   }
 }

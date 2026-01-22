@@ -225,8 +225,8 @@ const finalConfig = mergeConfig(dbConfig, systemConfig);
 **处理流程：**
 ```
 1. 验证签名（X-Gitlab-Token）
-2. 解析事件类型（X-Gitlab-Event）
-3. 保存 webhook 事件到数据库
+2. 解析事件类型（从 payload 的 object_kind 字段获取，如 merge_request、push、tag_push、note）
+3. 保存 webhook 事件到数据库（仅存储 objectKind，不使用映射）
 4. 根据事件类型分发到对应处理器
 5. 处理器调用 ReviewEngine
 ```
@@ -238,10 +238,10 @@ const finalConfig = mergeConfig(dbConfig, systemConfig);
 - `reviews` - 审查记录主表（包含状态、耗时、重试次数）
 - `reviewResults` - 审查结果（JSON 存储内联评论和摘要）
 - `reviewErrors` - 审查错误日志（支持重试标识）
-- `webhooks` - Webhook 事件日志
+- `webhooks` - Webhook 事件日志（使用 `objectKind` 字段存储 GitLab 原始事件类型，如 `merge_request`、`push`、`tag_push`、`note`）
 - `settings` - 配置数据（Key-Value 格式）
 
-**索引：** 在 `projectId + mrIid`、`status`、`createdAt` 等字段上建立索引。
+**索引：** 在 `projectId + mrIid`、`status`、`createdAt`、`objectKind` 等字段上建立索引。
 
 **数据库优化：**
 ```typescript
@@ -375,11 +375,6 @@ logger.info({ key: 'value' }, 'Message');
 - 包含错误类型、消息、堆栈跟踪
 - 支持重试标识（`retryable` 字段）
 
-**自定义错误类型（旧项目）：**
-- `AppError` - 通用应用错误
-- `WebhookVerificationError` - Webhook 验证失败
-- `GitLabAPIError` - GitLab API 错误
-
 ### AI 模型选择
 
 - **配置格式：** `provider:model-id`
@@ -393,36 +388,53 @@ logger.info({ key: 'value' }, 'Message');
 - **失败阈值：** `failureThreshold` 设置最低严重级别（critical > major > minor > suggestion）
 - **失败行为：** `blocking`（阻止合并）或 `non-blocking`
 
-## 旧项目架构（old/ 目录）
+## 配置说明
 
-旧项目使用 Hono + React + Vite，正在迁移到 Next.js。
+**重要架构决策：** 系统采用配置职责分离设计
 
-**映射关系：**
+### 环境变量（系统级参数）
 
-| Hono | Next.js API Routes |
-|------|-------------------|
-| `app.post('/webhook', ...)` | `app/api/webhook/route.ts` |
-| `app.route('/api/review', ...)` | `app/api/review/[...]/route.ts` |
-
-| TanStack Router | Next.js App Router |
-|----------------|-------------------|
-| `routes/settings/index.tsx` | `app/settings/page.tsx` |
-| `createRoute({ ... })` | 文件系统路由 |
-
-## 环境变量示例
+仅用于系统启动时的基础配置，通过环境变量或 `.env` 文件设置：
 
 ```bash
-# GitLab
-GITLAB_URL=https://gitlab.com
-GITLAB_TOKEN=glpat-xxx
-GITLAB_WEBHOOK_SECRET=your-secret
+# 服务器配置（默认值可省略）
+PORT=3000                      # 服务器端口，默认 3000
+HOST=0.0.0.0                   # 监听地址，默认 0.0.0.0
 
-# AI 提供商
-ANTHROPIC_API_KEY=sk-ant-xxx
-OPENAI_API_KEY=sk-xxx
+# 数据库路径（可选）
+DATABASE_PATH=/custom/path/to/database.db
+```
 
-# GitHub Copilot（可选）
-COPILOT_TOKEN_PATH=./data/copilot-token.json
+### 业务配置（数据库存储）
+
+GitLab、AI、Review、Webhook 等业务配置存储在数据库 `settings` 表中，支持动态更新：
+
+- **配置方式**：通过 `/settings` 页面可视化配置
+- **配置类别**：
+  - `gitlab` - GitLab URL、Token、Webhook Secret
+  - `ai` - AI 提供商配置（API Key、Base URL、模型选择）
+  - `review` - 审查规则（文件限制、语言、失败行为）
+  - `webhook` - 事件类型、触发条件
+  - `log` - 日志级别
+
+**配置示例（数据库中存储）：**
+```json
+{
+  "gitlab": {
+    "url": "https://gitlab.com",
+    "token": "glpat-xxx",
+    "webhookSecret": "your-secret"
+  },
+  "ai": {
+    "models": {
+      "anthropic:claude-sonnet-4-5": {
+        "provider": "anthropic",
+        "apiKey": "sk-ant-xxx",
+        "temperature": 0.5
+      }
+    }
+  }
+}
 ```
 
 ## 参考资料

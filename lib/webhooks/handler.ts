@@ -13,7 +13,6 @@ import {
   isNoteWebhook,
   extractWebhookMeta,
 } from './types';
-import { GITLAB_OBJECT_KIND_MAP } from '@/lib/constants';
 
 const logger = createLogger('webhook-handler');
 
@@ -70,15 +69,21 @@ export async function handleWebhook(deps: {
       };
     }
 
-    // Map GitLab object_kind to database eventType
-    const dbEventType = GITLAB_OBJECT_KIND_MAP[body.object_kind] || 'mr';
+    // Validate that the event type is supported
+    if (!SUPPORTED_EVENT_TYPES.includes(body.object_kind)) {
+      logger.warn({ objectKind: body.object_kind }, 'Unsupported object_kind');
+      return {
+        success: false,
+        message: `Unsupported object_kind: ${body.object_kind}`,
+        handled: false,
+      };
+    }
 
     // Log webhook to database
     const db = getDb();
     const webhookRecord = await db.insert(webhooks).values({
-      eventType: dbEventType,
       objectKind: body.object_kind,
-      payload: body as unknown as Record<string, unknown>,
+      payload: body,
       projectId: body.project.id.toString(),
       processed: false,
     }).returning();
