@@ -66,7 +66,6 @@ lib/
 │   ├── gitlab/           # GitLab API 客户端和 diff 解析
 │   └── review/           # 代码审查引擎
 ├── db/                   # 数据库访问层（Drizzle + SQLite）
-├── services/             # 服务层单例（ReviewEngine、GitLabClient）
 ├── webhooks/             # Webhook 处理器
 ├── utils/                # 工具函数
 └── constants.ts          # 常量定义
@@ -109,14 +108,18 @@ types/                    # 类型定义
 
 ## 核心模块详解
 
-### 1. 服务层单例模式（`lib/services/`）
+### 1. 功能域单例模式（Feature-Based Singletons）
 
-**重要架构决策：** 在 Next.js 环境中使用单例模式避免重复初始化。
+**重要架构决策：** 在 Next.js 环境中使用单例模式避免重复初始化。遵循 Feature-Based 架构，每个功能模块管理自己的单例。
 
 ```typescript
-// lib/services/index.ts
+// lib/features/review/singleton.ts
 export async function getReviewEngine(): Promise<ReviewEngine>
+export function resetReviewEngine(): void  // 用于测试
+
+// lib/features/gitlab/singleton.ts
 export async function getGitLabClient(): Promise<GitLabClient>
+export function resetGitLabClient(): void  // 用于测试
 ```
 
 **使用场景：**
@@ -248,7 +251,11 @@ PRAGMA foreign_keys = ON;       // 外键约束
 PRAGMA synchronous = NORMAL;    // 同步模式
 ```
 
-**数据库位置：** `data/ai-code-review.db`
+**数据库位置：** 用户数据目录（跨平台）
+- Linux: `~/.local/share/ai-code-review/ai-code-review.db`
+- macOS: `~/Library/Application Support/ai-code-review/ai-code-review.db`
+- Windows: `%APPDATA%\ai-code-review\ai-code-review.db`
+- 可通过环境变量 `DATABASE_PATH` 自定义
 
 ## Next.js 页面类型规范
 
@@ -343,10 +350,10 @@ export type { ExampleType } from './types';
 
 - 从 `@/types/*` 导入类型定义
 - 从 `@/lib/features/*` 导入业务逻辑
+- 从 `@/lib/features/*/singleton` 导入功能域单例
 - 从 `@/actions/*` 导入 Server Actions
 - 从 `@/components/*` 导入 UI 组件
 - 从 `@/lib/db` 导入数据库客户端和 schema
-- 从 `@/lib/services` 导入服务层单例
 
 ### 日志系统
 

@@ -4,6 +4,7 @@ import { AICodeReviewRegistry } from '@/lib/features/ai';
 import { CopilotTokenStorage } from '@/lib/features/ai/github-copilot';
 import { ReviewEngine } from '@/lib/features/review';
 import { DEFAULT_AI_MODEL } from '@/lib/constants';
+import { getCopilotTokenPath } from '@/lib/db/path';
 
 /**
  * ReviewEngine Singleton
@@ -21,9 +22,7 @@ export async function getReviewEngine(): Promise<ReviewEngine> {
     const config = await getConfig();
 
     // Create GitHub Copilot token storage
-    const copilotTokenStorage = new CopilotTokenStorage(
-      process.env.COPILON_TOKEN_PATH || './data/copilot-token.json',
-    );
+    const copilotTokenStorage = new CopilotTokenStorage(getCopilotTokenPath());
 
     // Create AI registry
     const aiRegistry = new AICodeReviewRegistry(config.ai, copilotTokenStorage);

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getConfig } from '@/lib/features/config';
 import { handleWebhook } from '@/lib/webhooks/handler';
-import { getReviewEngine } from '@/lib/services';
+import { getReviewEngine } from '@/lib/features/review/singleton';
 
 export async function POST(request: Request) {
   try {

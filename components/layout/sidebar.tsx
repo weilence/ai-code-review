@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import type { Route } from 'next';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
@@ -11,10 +12,10 @@ import {
 } from 'lucide-react';
 
 const navigation = [
-  { name: '仪表盘', href: '/', icon: LayoutDashboard },
-  { name: '审查记录', href: '/reviews', icon: FileText },
-  { name: 'Webhook 监控', href: '/webhooks', icon: Activity },
-  { name: '设置', href: '/settings', icon: Settings },
+  { name: '仪表盘', href: '/' as Route, icon: LayoutDashboard },
+  { name: '审查记录', href: '/reviews' as Route, icon: FileText },
+  { name: 'Webhook 监控', href: '/webhooks' as Route, icon: Activity },
+  { name: '设置', href: '/settings' as Route, icon: Settings },
 ];
 
 export default function Sidebar() {

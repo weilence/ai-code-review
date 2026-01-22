@@ -2,7 +2,7 @@
 
 import { eq, desc, count, and } from 'drizzle-orm';
 import { getDb, reviews, reviewResults, reviewErrors } from '@/lib/db';
-import { getReviewEngine } from '@/lib/services';
+import { getReviewEngine } from '@/lib/features/review/singleton';
 import { createLogger } from '@/lib/utils/logger';
 
 const logger = createLogger('review-actions');

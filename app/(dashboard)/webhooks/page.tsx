@@ -4,6 +4,9 @@ import { cn } from '@/lib/utils';
 import { CheckCircle2, Clock } from 'lucide-react';
 import { PayloadViewer } from '@/components/webhooks/payload-viewer';
 
+// 强制动态渲染，避免构建时查询数据库
+export const dynamic = 'force-dynamic';
+
 export default async function WebhooksPage() {
   const db = getDb();
   const webhookList = await db

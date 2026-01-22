@@ -9,7 +9,7 @@ import type {
   SpeechModelV3,
   TranscriptionModelV3,
 } from '@ai-sdk/provider';
-import { createProviderRegistry, wrapLanguageModel } from 'ai';
+import { createProviderRegistry, LanguageModelMiddleware, wrapLanguageModel } from 'ai';
 import type { AIConfig } from '@/lib/features/config';
 import type { AIModelConfig } from '@/lib/features/config/schema';
 import { createLogger } from '@/lib/utils/logger';
@@ -86,24 +86,29 @@ export class AICodeReviewRegistry implements Registry {
       supportsStructuredOutputs?: boolean
     };
 
+    const middlewares: LanguageModelMiddleware[] = [
+      {
+        specificationVersion: 'v3',
+        transformParams: ({ params }) => {
+          if (params.responseFormat?.type === 'json' && params.responseFormat.schema) {
+            const schema = params.responseFormat.schema;
+
+            delete schema.$schema;
+            delete schema.additionalProperties;
+          }
+
+          return Promise.resolve(params);
+        },
+      },
+    ]
+
+    if (process.env.NODE_ENV !== 'production') {
+      middlewares.push(devToolsMiddleware());
+    }
+
     return wrapLanguageModel({
       model,
-      middleware: [
-        {
-          specificationVersion: 'v3',
-          transformParams: ({ params }) => {
-            if (params.responseFormat?.type === 'json' && params.responseFormat.schema) {
-              const schema = params.responseFormat.schema;
-
-              delete schema.$schema;
-              delete schema.additionalProperties;
-            }
-
-            return Promise.resolve(params);
-          },
-        },
-        devToolsMiddleware(),
-      ],
+      middleware: middlewares,
     });
   }
 

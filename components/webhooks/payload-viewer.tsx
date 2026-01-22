@@ -22,7 +22,7 @@ export function PayloadViewer({ payload }: PayloadViewerProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="link" className="text-sm text-blue-500">
+        <Button variant="ghost" className="text-sm text-blue-500 underline">
           查看详情
         </Button>
       </DialogTrigger>

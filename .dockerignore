@@ -1,0 +1,55 @@
+# 依赖
+node_modules
+npm-debug.log
+yarn-error.log
+bun.lockb
+
+# 构建输出
+.next
+out
+dist
+build
+
+# 开发工具
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# 环境变量（敏感信息）
+.env
+.env*.local
+.envrc
+
+# 数据库（用户数据目录不应包含在镜像中）
+data
+*.db
+*.db-shm
+*.db-wal
+
+# 测试
+coverage
+.nyc_output
+
+# 文档
+README.md
+CHANGELOG.md
+LICENSE
+docs
+*.md
+
+# Docker 文件本身
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.*.yml
+
+# 其他
+.DS_Store
+*.log

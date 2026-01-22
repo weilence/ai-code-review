@@ -7,6 +7,7 @@
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
+import { logger } from '../utils';
 
 /**
  * 应用数据目录名称
@@ -52,6 +53,7 @@ export function getDatabasePath(): string {
 
   // 使用用户数据目录
   const dataDir = getUserDataDir();
+  logger.info(`Using database path in user data directory: ${dataDir}`);
 
   return path.join(dataDir, 'ai-code-review.db');
 }
@@ -68,4 +70,19 @@ export function ensureDataDir(): string {
   }
 
   return dataDir;
+}
+
+/**
+ * 获取 GitHub Copilot token 文件路径
+ * 优先使用环境变量 COPILOT_TOKEN_PATH，否则使用用户数据目录
+ */
+export function getCopilotTokenPath(): string {
+  // 如果设置了环境变量，直接使用
+  if (process.env.COPILOT_TOKEN_PATH) {
+    return process.env.COPILOT_TOKEN_PATH;
+  }
+
+  // 使用用户数据目录
+  const dataDir = getUserDataDir();
+  return path.join(dataDir, 'copilot-token.json');
 }
