@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.15",
+    "@ai-sdk/devtools": "^0.0.6",
     "@ai-sdk/openai": "^3.0.12",
     "@gitbeaker/rest": "^43.8.0",
     "@opeoginni/github-copilot-openai-compatible": "^1.0.0",

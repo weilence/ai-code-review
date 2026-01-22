@@ -20,20 +20,26 @@ export async function getReviews(options?: {
     const db = getDb();
     const { status, limit = 50, offset = 0 } = options || {};
 
-    const where = status ? eq(reviews.status, status) : undefined;
+    // 构建查询条件
+    const whereCondition = status ? eq(reviews.status, status) : undefined;
 
-    const items = await db
+    // 执行主查询
+    const itemsQuery = db
       .select()
       .from(reviews)
-      .where(where)
       .orderBy(desc(reviews.createdAt))
       .limit(limit)
       .offset(offset);
 
-    const [{ value: total }] = await db
-      .select({ value: count() })
-      .from(reviews)
-      .where(where);
+    const items = whereCondition
+      ? await itemsQuery.where(whereCondition)
+      : await itemsQuery;
+
+    // 执行计数查询
+    const countQuery = db.select({ value: count() }).from(reviews);
+    const [{ value: total }] = whereCondition
+      ? await countQuery.where(whereCondition)
+      : await countQuery;
 
     return {
       success: true,

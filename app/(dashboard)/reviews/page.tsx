@@ -2,13 +2,25 @@ import Link from 'next/link';
 import { getReviews } from '@/actions/review';
 import { cn } from '@/lib/utils';
 import { CheckCircle2, Clock, XCircle, AlertCircle } from 'lucide-react';
+import type { PageProps } from '@/types/next';
+import { getStringParam } from '@/types/next';
 
 export default async function ReviewsPage({
   searchParams,
-}: {
-  searchParams: { status?: string };
-}) {
-  const status = searchParams.status as 'pending' | 'running' | 'completed' | 'failed' | undefined;
+}: PageProps) {
+  // 使用辅助函数获取 search 参数，自动处理数组情况
+  const statusParam = await getStringParam(
+    searchParams || Promise.resolve({}),
+    'status'
+  );
+
+  // 只接受有效的状态值
+  const validStatuses = ['pending', 'running', 'completed', 'failed'] as const;
+  type ValidStatus = typeof validStatuses[number];
+  const status = statusParam && validStatuses.includes(statusParam as ValidStatus)
+    ? (statusParam as 'pending' | 'running' | 'completed' | 'failed')
+    : undefined;
+
   const result = await getReviews({ status, limit: 50 });
 
   const reviews = result.success && result.data ? result.data : [];

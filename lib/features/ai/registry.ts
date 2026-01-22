@@ -1,5 +1,6 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
+import { devToolsMiddleware } from '@ai-sdk/devtools';
 import type {
   EmbeddingModelV3,
   ImageModelV3,
@@ -81,7 +82,29 @@ export class AICodeReviewRegistry implements Registry {
   }
 
   languageModel(id: LanguageModelId): LanguageModelV3 {
-    return this.registry.languageModel(id);
+    const model = this.registry.languageModel(id) as LanguageModelV3 & {
+      supportsStructuredOutputs?: boolean
+    };
+
+    return wrapLanguageModel({
+      model,
+      middleware: [
+        {
+          specificationVersion: 'v3',
+          transformParams: ({ params }) => {
+            if (params.responseFormat?.type === 'json' && params.responseFormat.schema) {
+              const schema = params.responseFormat.schema;
+
+              delete schema.$schema;
+              delete schema.additionalProperties;
+            }
+
+            return Promise.resolve(params);
+          },
+        },
+        devToolsMiddleware(),
+      ],
+    });
   }
 
   embeddingModel(id: EmbeddingModelId): EmbeddingModelV3 {
