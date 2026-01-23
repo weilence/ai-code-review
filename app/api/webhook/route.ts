@@ -1,18 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getConfig } from '@/lib/features/config';
 import { handleWebhook } from '@/lib/webhooks/handler';
-import { getReviewEngine } from '@/lib/features/review/singleton';
 
 export async function POST(request: Request) {
   try {
-    // 获取配置和服务
+    // 获取配置
     const config = await getConfig();
-    const reviewEngine = await getReviewEngine();
 
     // 处理 webhook
     const result = await handleWebhook({
       webhookSecret: config.gitlab.webhookSecret,
-      reviewEngine,
       eventsConfig: config.webhook,
       request,
     });

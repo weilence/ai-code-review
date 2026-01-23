@@ -1,5 +1,4 @@
 import type { WebhookEventsConfig } from '@/lib/features/config';
-import type { ReviewEngine } from '@/lib/features/review';
 import { AI_COMMENT_MARKER } from '@/lib/features/review/prompts';
 import { getDb, webhooks } from '@/lib/db';
 import { createLogger } from '@/lib/utils/logger';
@@ -45,7 +44,6 @@ export interface WebhookResponse {
  */
 export async function handleWebhook(deps: {
   webhookSecret: string;
-  reviewEngine: ReviewEngine;
   eventsConfig: WebhookEventsConfig;
   request: Request;
 }): Promise<WebhookResponse> {
@@ -146,7 +144,6 @@ export async function handleWebhook(deps: {
     if (isMergeRequestWebhook(body)) {
       const handlerResult = await handleMergeRequestEvent({
         webhook: body,
-        reviewEngine: deps.reviewEngine,
         config: deps.eventsConfig,
         webhookEventId,
       });
@@ -162,7 +159,6 @@ export async function handleWebhook(deps: {
     } else if (isNoteWebhook(body)) {
       const handlerResult = await handleNoteEvent({
         webhook: body,
-        reviewEngine: deps.reviewEngine,
         config: deps.eventsConfig,
         webhookEventId,
       });

@@ -1,5 +1,5 @@
 import type { WebhookEventsConfig } from '@/lib/features/config';
-import type { ReviewEngine } from '@/lib/features/review';
+import { getQueueManager } from '@/lib/features/queue';
 import { createLogger } from '@/lib/utils/logger';
 import type { NoteWebhook } from '../types';
 
@@ -7,7 +7,6 @@ const logger = createLogger('note-handler');
 
 export interface NoteHandlerOptions {
   webhook: NoteWebhook;
-  reviewEngine: ReviewEngine;
   config: WebhookEventsConfig;
   webhookEventId?: number;
 }
@@ -25,7 +24,7 @@ export interface NoteHandlerResult {
 export async function handleNoteEvent(
   options: NoteHandlerOptions,
 ): Promise<NoteHandlerResult> {
-  const { webhook, reviewEngine, config } = options;
+  const { webhook, config } = options;
   const { object_attributes: note, project, merge_request: mr } = webhook;
 
   logger.info(
@@ -79,20 +78,28 @@ export async function handleNoteEvent(
     'Review command detected, triggering review',
   );
 
-  // Trigger review
+  // Enqueue review task
   try {
-    await reviewEngine.reviewMergeRequest({
+    const queueManager = await getQueueManager();
+    await queueManager.enqueue({
       projectId: project.id,
       mrIid: mr.iid,
+      projectPath: project.path_with_namespace,
+      mrTitle: mr.title,
+      mrAuthor: webhook.user.username,
+      mrDescription: mr.description || undefined,
+      sourceBranch: mr.source_branch,
+      targetBranch: mr.target_branch,
       triggeredBy: 'command',
       triggerEvent: command,
       webhookEventId: options.webhookEventId,
+      priority: 2, // Higher priority for command triggers (1=highest, 10=lowest)
     });
 
     return { handled: true, skipped: false };
   } catch (error) {
-    logger.error({ error, projectId: project.id, mrIid: mr.iid }, 'Failed to trigger review');
+    logger.error({ error, projectId: project.id, mrIid: mr.iid }, 'Failed to enqueue review task');
 
-    return { handled: false, skipped: true, skipReason: 'Review failed' };
+    return { handled: false, skipped: true, skipReason: 'Failed to enqueue task' };
   }
 }

@@ -2,7 +2,6 @@
 
 import { eq, desc, count, and } from 'drizzle-orm';
 import { getDb, reviews, reviewLogs } from '@/lib/db';
-import { getReviewEngine } from '@/lib/features/review/singleton';
 import { createLogger } from '@/lib/utils/logger';
 
 const logger = createLogger('review-actions');
@@ -194,22 +193,39 @@ export async function triggerManualReview(projectId: number, mrIid: number) {
   try {
     logger.info({ projectId, mrIid }, 'Triggering manual review');
 
-    const reviewEngine = await getReviewEngine();
+    // Use queue system
+    const { getQueueManager } = await import('@/lib/features/queue/singleton');
+    const { GitLabClient } = await import('@/lib/features/gitlab/client');
+    const { getConfig } = await import('@/lib/features/config');
 
-    const result = await reviewEngine.reviewMergeRequest({
+    const queueManager = await getQueueManager();
+    const config = await getConfig();
+
+    // Get MR information from GitLab
+    const gitlabClient = new GitLabClient(config.gitlab);
+    const mrChanges = await gitlabClient.getMergeRequestChanges(
+      projectId,
+      mrIid
+    );
+
+    // Enqueue task
+    const taskId = await queueManager.enqueue({
       projectId,
       mrIid,
+      projectPath: mrChanges.webUrl.split('/').slice(3, 5).join('/'),
+      mrTitle: mrChanges.title,
+      mrAuthor: mrChanges.author.username,
+      mrDescription: mrChanges.description || undefined,
+      sourceBranch: mrChanges.sourceBranch,
+      targetBranch: mrChanges.targetBranch,
       triggeredBy: 'manual',
+      priority: 3, // Higher priority for manual triggers
     });
 
     return {
       success: true,
-      data: {
-        inlineCommentsPosted: result.inlineCommentsPosted,
-        summaryPosted: result.summaryPosted,
-        errors: result.errors,
-      },
-      message: 'Review triggered successfully',
+      data: { taskId },
+      message: '审查任务已加入队列',
     };
   } catch (error) {
     logger.error({ error, projectId, mrIid }, 'Failed to trigger manual review');
@@ -248,37 +264,29 @@ export async function retryReview(reviewId: number) {
 
     logger.info({ reviewId }, 'Retrying failed review');
 
-    // 更新状态为 running，增加重试计数
-    await db
-      .update(reviews)
-      .set({
-        status: 'running',
-        retryCount: reviewData.retryCount + 1,
-        startedAt: new Date(),
-        updatedAt: new Date(),
-        lastErrorMessage: null,
-      })
-      .where(eq(reviews.id, reviewId));
+    // Use queue system
+    const { getQueueManager } = await import('@/lib/features/queue/singleton');
+    const queueManager = await getQueueManager();
 
-    // 启动后台任务（不等待）
-    ;(async () => {
-      try {
-        const reviewEngine = await getReviewEngine();
-        await reviewEngine.reviewMergeRequest({
-          projectId: Number(reviewData.projectId),
-          mrIid: reviewData.mrIid,
-          triggeredBy: 'manual',
-          reviewId, // 传入现有 reviewId 以重用记录
-        });
-      } catch (error) {
-        logger.error({ error, reviewId }, 'Background review retry failed');
-      }
-    })();
+    // Enqueue as a retry task
+    const taskId = await queueManager.enqueue({
+      projectId: Number(reviewData.projectId),
+      mrIid: reviewData.mrIid,
+      projectPath: reviewData.projectPath,
+      mrTitle: reviewData.mrTitle,
+      mrAuthor: reviewData.mrAuthor,
+      mrDescription: reviewData.mrDescription || undefined,
+      sourceBranch: reviewData.sourceBranch,
+      targetBranch: reviewData.targetBranch,
+      triggeredBy: 'manual',
+      priority: 1, // Highest priority for retries
+    });
 
     // 立即返回成功
     return {
       success: true,
-      message: '审查任务已启动，正在后台执行',
+      data: { taskId },
+      message: '审查重试任务已加入队列',
     };
   } catch (error) {
     logger.error({ error, reviewId }, 'Failed to start review retry');
