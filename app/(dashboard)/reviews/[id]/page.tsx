@@ -51,11 +51,11 @@ export default async function ReviewDetailPage({
       {/* Info Cards */}
       <InfoCards review={review} />
 
-      {/* Review Logs */}
-      <ReviewLogs logs={logs} />
-
       {/* MR Description */}
       <MRDescription description={review.mrDescription} />
+
+      {/* Review Logs */}
+      <ReviewLogs logs={logs} />
     </div>
   );
 }

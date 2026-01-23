@@ -21,7 +21,7 @@ export function WebhookConfigForm({ config, onChange }: WebhookConfigFormProps) 
   const handleMrEventsChange = (value: string) => {
     onChange({
       ...config,
-      mr: { ...config.mr, events: value }
+      mr: { ...config.mr, events: value.split(',').map(x => x.trim()).filter(Boolean) }
     });
   };
 
@@ -38,7 +38,7 @@ export function WebhookConfigForm({ config, onChange }: WebhookConfigFormProps) 
   const handlePushBranchesChange = (value: string) => {
     onChange({
       ...config,
-      push: { ...config.push, branches: value }
+      push: { ...config.push, branches: value.split(',').map(x => x.trim()).filter(Boolean) }
     });
   };
 
@@ -55,7 +55,7 @@ export function WebhookConfigForm({ config, onChange }: WebhookConfigFormProps) 
   const handleNoteCommandsChange = (value: string) => {
     onChange({
       ...config,
-      note: { ...config.note, commands: value }
+      note: { ...config.note, commands: value.split(',').map(x => x.trim()).filter(Boolean) }
     });
   };
 

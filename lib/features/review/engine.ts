@@ -168,6 +168,7 @@ export class ReviewEngine {
         errorMessage,
         errorStack: error instanceof Error ? error.stack : null,
         retryable: true,
+        createdAt: new Date(),
       });
 
       await db.update(reviews)
@@ -215,6 +216,7 @@ export class ReviewEngine {
       durationMs: analysis.durationMs,
       inlineCommentsPosted,
       summaryPosted: 1,
+      createdAt: new Date(),
     });
 
     const shouldFail = this.hasIssuesAboveThreshold(analysis.review.summary);

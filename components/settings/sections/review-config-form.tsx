@@ -61,7 +61,7 @@ export function ReviewConfigForm({ config, onChange }: ReviewConfigFormProps) {
             id="review-skip-files"
             type="text"
             value={skipFiles}
-            onChange={(e) => handleChange('skipFiles', e.target.value)}
+            onChange={(e) => handleChange('skipFiles', e.target.value.split(',').map(x => x.trim()).filter(Boolean))}
             placeholder="*.lock, *.min.js, package-lock.json"
             className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm font-mono"
           />
