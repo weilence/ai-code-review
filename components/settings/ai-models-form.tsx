@@ -141,16 +141,15 @@ function ModelCard({ model, index, totalModels, onUpdate, onRemove, onMoveUp, on
   return (
     <div className="rounded-xl border bg-card p-4 shadow-sm">
       {/* 卡片头部 */}
-      <div className="flex items-center justify-between">
+      <div
+        className="flex items-center justify-between cursor-pointer"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
         <div className="flex items-center gap-3 flex-1">
-          <button
-            type="button"
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="flex items-center gap-2 font-semibold hover:text-primary transition-colors"
-          >
+          <div className="flex items-center gap-2 font-semibold hover:text-primary transition-colors">
             <span className="text-muted-foreground">{index + 1}.</span>
             <span>{model.id || '未命名模型'}</span>
-          </button>
+          </div>
           <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
             {model.provider}
           </span>
@@ -160,7 +159,10 @@ function ModelCard({ model, index, totalModels, onUpdate, onRemove, onMoveUp, on
           {/* 上移按钮 */}
           <button
             type="button"
-            onClick={onMoveUp}
+            onClick={(e) => {
+              e.stopPropagation();
+              onMoveUp();
+            }}
             disabled={index === 0}
             className="p-2 text-muted-foreground hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed rounded transition-colors"
             title="上移"
@@ -171,7 +173,10 @@ function ModelCard({ model, index, totalModels, onUpdate, onRemove, onMoveUp, on
           {/* 下移按钮 */}
           <button
             type="button"
-            onClick={onMoveDown}
+            onClick={(e) => {
+              e.stopPropagation();
+              onMoveDown();
+            }}
             disabled={index === totalModels - 1}
             className="p-2 text-muted-foreground hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed rounded transition-colors"
             title="下移"
@@ -183,7 +188,10 @@ function ModelCard({ model, index, totalModels, onUpdate, onRemove, onMoveUp, on
           {canRemove && (
             <button
               type="button"
-              onClick={onRemove}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove();
+              }}
               className="p-2 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded transition-colors"
               title="删除"
             >
