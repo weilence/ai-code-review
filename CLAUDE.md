@@ -145,14 +145,8 @@ export function resetGitLabClient(): void  // 用于测试
 
 **配置加载流程：**
 ```typescript
-// 1. 从环境变量加载系统配置（port、host）
-const systemConfig = loadSystemConfigFromEnv();
-
-// 2. 从数据库加载业务配置
-const dbConfig = await loadConfigFromDB();
-
-// 3. 合并配置
-const finalConfig = mergeConfig(dbConfig, systemConfig);
+// 获取数据库配置（从数据库：GitLab、AI、Review、Webhook、Log、Queue）
+const dbConfig = await getDBConfig();
 ```
 
 **AI 模型配置格式：**

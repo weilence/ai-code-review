@@ -196,10 +196,10 @@ export async function triggerManualReview(projectId: number, mrIid: number) {
     // Use queue system
     const { getQueueManager } = await import('@/lib/features/queue/singleton');
     const { GitLabClient } = await import('@/lib/features/gitlab/client');
-    const { getConfig } = await import('@/lib/features/config');
+    const { getDBConfig } = await import('@/lib/features/config');
 
     const queueManager = await getQueueManager();
-    const config = await getConfig();
+    const config = await getDBConfig();
 
     // Get MR information from GitLab
     const gitlabClient = new GitLabClient(config.gitlab);

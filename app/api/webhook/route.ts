@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getConfig } from '@/lib/features/config';
+import { getDBConfig } from '@/lib/features/config';
 import { handleWebhook } from '@/lib/webhooks/handler';
 
 export async function POST(request: Request) {
   try {
     // 获取配置
-    const config = await getConfig();
+    const config = await getDBConfig();
 
     // 处理 webhook
     const result = await handleWebhook({

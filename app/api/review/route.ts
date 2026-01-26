@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getConfig } from '@/lib/features/config';
+import { getDBConfig } from '@/lib/features/config';
 import { getReviewEngine } from '@/lib/features/review/singleton';
 import { parseGitLabMRUrl } from '@/lib/utils/gitlab';
 import { GitLabClient } from '@/lib/features/gitlab/client';
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     const { projectPath, mrIid } = parsed;
 
     // 获取配置和服务
-    const config = await getConfig();
+    const config = await getDBConfig();
     const reviewEngine = await getReviewEngine();
 
     // 创建 GitLab client

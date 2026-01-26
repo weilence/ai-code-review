@@ -1,16 +1,16 @@
 'use client';
 
-import type { AppConfig } from '@/lib/features/config/schema';
+import type { DBConfig } from '@/lib/features/config/schema';
 
 interface QueueConfigFormProps {
-  config: AppConfig['queue'];
-  onChange: (config: AppConfig['queue']) => void;
+  config: DBConfig['queue'];
+  onChange: (config: DBConfig['queue']) => void;
 }
 
 export function QueueConfigForm({ config, onChange }: QueueConfigFormProps) {
-  const handleChange = <K extends keyof AppConfig['queue']>(
+  const handleChange = <K extends keyof DBConfig['queue']>(
     field: K,
-    value: AppConfig['queue'][K]
+    value: DBConfig['queue'][K]
   ) => {
     onChange({ ...config, [field]: value });
   };

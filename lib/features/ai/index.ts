@@ -9,11 +9,3 @@ export { AICodeReviewRegistry, type LanguageModelId, type Registry } from './reg
 // GitHub Copilot integration
 export { CopilotTokenStorage } from './github-copilot';
 export type { CopilotTokenStorage as CopilotTokenStorageType } from './github-copilot';
-
-// Re-export types from types/ai
-export type {
-  AIProvider,
-  AIReviewResult,
-  AIReviewSummary,
-  AIModelCallParams,
-} from '@/types/ai';

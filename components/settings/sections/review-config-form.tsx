@@ -1,16 +1,16 @@
 'use client';
 
-import type { AppConfig } from '@/lib/features/config/schema';
+import type { DBConfig } from '@/lib/features/config/schema';
 
 interface ReviewConfigFormProps {
-  config: AppConfig['review'];
-  onChange: (config: AppConfig['review']) => void;
+  config: DBConfig['review'];
+  onChange: (config: DBConfig['review']) => void;
 }
 
 export function ReviewConfigForm({ config, onChange }: ReviewConfigFormProps) {
-  const handleChange = <K extends keyof AppConfig['review']>(
+  const handleChange = <K extends keyof DBConfig['review']>(
     field: K,
-    value: AppConfig['review'][K]
+    value: DBConfig['review'][K]
   ) => {
     onChange({ ...config, [field]: value });
   };

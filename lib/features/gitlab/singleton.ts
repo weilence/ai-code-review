@@ -1,4 +1,4 @@
-import { getConfig } from '@/lib/features/config';
+import { getDBConfig } from '@/lib/features/config';
 import { GitLabClient } from './client';
 
 /**
@@ -13,7 +13,7 @@ let gitlabClientInstance: GitLabClient | null = null;
  */
 export async function getGitLabClient(): Promise<GitLabClient> {
   if (!gitlabClientInstance) {
-    const config = await getConfig();
+    const config = await getDBConfig();
     gitlabClientInstance = new GitLabClient(config.gitlab);
   }
 

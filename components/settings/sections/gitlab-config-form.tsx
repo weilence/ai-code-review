@@ -1,14 +1,14 @@
 'use client';
 
-import type { AppConfig } from '@/lib/features/config/schema';
+import type { DBConfig } from '@/lib/features/config/schema';
 
 interface GitLabConfigFormProps {
-  config: AppConfig['gitlab'];
-  onChange: (config: AppConfig['gitlab']) => void;
+  config: DBConfig['gitlab'];
+  onChange: (config: DBConfig['gitlab']) => void;
 }
 
 export function GitLabConfigForm({ config, onChange }: GitLabConfigFormProps) {
-  const handleChange = (field: keyof AppConfig['gitlab'], value: string) => {
+  const handleChange = (field: keyof DBConfig['gitlab'], value: string) => {
     onChange({ ...config, [field]: value });
   };
 

@@ -1,11 +1,11 @@
 'use client';
 
-import type { AppConfig, AIModelConfig } from '@/lib/features/config/schema';
+import type { DBConfig, AIModelConfig } from '@/lib/features/config/schema';
 import { AIModelsForm } from '../ai-models-form';
 
 interface AIConfigFormProps {
-  config: AppConfig['ai'];
-  onChange: (config: AppConfig['ai']) => void;
+  config: DBConfig['ai'];
+  onChange: (config: DBConfig['ai']) => void;
 }
 
 export function AIConfigForm({ config, onChange }: AIConfigFormProps) {

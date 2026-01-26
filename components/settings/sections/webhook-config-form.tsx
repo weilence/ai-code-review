@@ -1,10 +1,10 @@
 'use client';
 
-import type { AppConfig } from '@/lib/features/config/schema';
+import type { DBConfig } from '@/lib/features/config/schema';
 
 interface WebhookConfigFormProps {
-  config: AppConfig['webhook'];
-  onChange: (config: AppConfig['webhook']) => void;
+  config: DBConfig['webhook'];
+  onChange: (config: DBConfig['webhook']) => void;
 }
 
 export function WebhookConfigForm({ config, onChange }: WebhookConfigFormProps) {

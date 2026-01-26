@@ -5,36 +5,20 @@
  */
 
 export {
-  getConfig,
-  loadSystemConfigFromEnv,
-  loadConfigFromDB,
-  setConfigValue,
-  setConfigValues,
-  deleteConfigValue,
-  getConfigValue,
-  refreshConfig,
-  getCachedConfig,
-  flattenConfig,
-  mergeConfig,
+  getDBConfig,
+  setDBConfig,
 } from './loader';
 
-export { AppConfigSchema } from './schema';
+export { DBConfigSchema } from './schema';
 
 // Re-export types from schema
 export type {
-  AppConfig,
+  DBConfig,
   AIModelConfig,
   Language,
   AIConfig,
   GitLabConfig,
   WebhookEventsConfig,
   ReviewConfig,
+  QueueConfig,
 } from './schema';
-
-// Re-export types from types/config
-export type {
-  AppConfig as AppConfigType,
-  ReviewRulesConfig,
-  WebhookConfig,
-  LogConfig,
-} from '@/types/config';

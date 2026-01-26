@@ -147,10 +147,10 @@ export async function getQueueManager(): Promise<QueueManager> {
     // Lazy initialization
     // Import here to avoid circular dependencies
     const { getReviewEngine } = await import('@/lib/features/review/singleton');
-    const { getConfig } = await import('@/lib/features/config');
+    const { getDBConfig } = await import('@/lib/features/config');
 
     const reviewEngine = await getReviewEngine();
-    const config = await getConfig();
+    const config = await getDBConfig();
 
     managerInstance = new QueueManager(reviewEngine, config.queue);
 

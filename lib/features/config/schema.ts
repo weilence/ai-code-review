@@ -25,53 +25,42 @@ export type AIModelConfig = z.infer<typeof AIModelConfigSchema>;
 
 /**
  * AI 模型配置的 Zod schema
- * 支持从数据库加载的 JSON 字符串或对象
+ * 新格式直接使用对象，不再需要 JSON 字符串解析
  */
-const AIModelsSchema = z
-  .union([
-    // 从数据库加载时可能是 JSON 字符串
-    z.string().transform((str, ctx) => {
-      try {
-        return JSON.parse(str);
-      } catch {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Invalid JSON format for ai.models',
-        });
-        return z.NEVER;
-      }
-    }),
-    // 或者已经是对象
-    z.record(z.string(), AIModelConfigSchema),
-  ])
-  .transform((val) => {
-    // 确保最终返回的是正确的对象格式
-    return val as Record<string, AIModelConfig>;
-  });
+const AIModelsSchema = z.record(z.string(), AIModelConfigSchema);
 
 // ============================================================================
 // Helper Schemas
 // ============================================================================
 
-const commaSeparated = (defaultValue: string[]) =>
-  z.string()
-    .optional()
-    .transform(s => s ? s.split(',').map(x => x.trim()).filter(Boolean) : defaultValue);
-
-const booleanString = (defaultValue: boolean) =>
-  z.string()
-    .optional()
-    .transform(s => s === undefined ? defaultValue : (defaultValue ? s !== 'false' : s === 'true'));
+// 辅助函数：定义数组类型
+const arrayField = (defaultValue: string[]) =>
+  z.array(z.string()).default(defaultValue);
 
 // ============================================================================
-// App Config Schema
+// System Config Schema (环境变量配置)
 // ============================================================================
 
-export const AppConfigSchema = z.object({
-  // Server config (Next.js uses PORT env var by default)
+/**
+ * 系统级配置 Schema（从环境变量读取）
+ * 只包含服务器启动时的基础配置
+ */
+export const SystemConfigSchema = z.object({
   port: z.coerce.number().positive().default(3000),
   host: z.string().default('0.0.0.0'),
+});
 
+export type SystemConfig = z.infer<typeof SystemConfigSchema>;
+
+// ============================================================================
+// Database Config Schema (数据库配置)
+// ============================================================================
+
+/**
+ * 数据库配置 Schema（从数据库读取）
+ * 包含所有业务配置
+ */
+export const DBConfigSchema = z.object({
   // GitLab config
   gitlab: z.object({
     url: z.string().default('https://gitlab.com'),
@@ -103,17 +92,17 @@ export const AppConfigSchema = z.object({
   // Webhook config
   webhook: z.object({
     mr: z.object({
-      enabled: booleanString(true),
-      events: commaSeparated(['open', 'update']),
-      reviewDrafts: booleanString(false),
+      enabled: z.boolean().default(true),
+      events: arrayField(['open', 'update']),
+      reviewDrafts: z.boolean().default(false),
     }),
     push: z.object({
-      enabled: booleanString(false),
-      branches: commaSeparated([]),
+      enabled: z.boolean().default(false),
+      branches: arrayField([]),
     }),
     note: z.object({
-      enabled: booleanString(true),
-      commands: commaSeparated(['/review', '/ai-review']),
+      enabled: z.boolean().default(true),
+      commands: arrayField(['/review', '/ai-review']),
     }),
   }).default({
     mr: { enabled: true, events: ['open', 'update'], reviewDrafts: false },
@@ -125,9 +114,9 @@ export const AppConfigSchema = z.object({
   review: z.object({
     maxFiles: z.coerce.number().positive().default(50),
     maxLinesPerFile: z.coerce.number().positive().default(1000),
-    skipFiles: commaSeparated(['*.lock', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', '*.min.js', '*.min.css']),
-    inlineComments: booleanString(true),
-    summaryComment: booleanString(true),
+    skipFiles: arrayField(['*.lock', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', '*.min.js', '*.min.css']),
+    inlineComments: z.boolean().default(true),
+    summaryComment: z.boolean().default(true),
     language: z.enum(['简体中文', 'English']).optional(),
     failureBehavior: z.enum(['blocking', 'non-blocking']).default('non-blocking'),
     failureThreshold: z.enum(['critical', 'major', 'minor', 'suggestion']).default('critical'),
@@ -154,7 +143,7 @@ export const AppConfigSchema = z.object({
 
   // Queue config
   queue: z.object({
-    enabled: booleanString(true),
+    enabled: z.boolean().default(true),
     pollingIntervalMs: z.coerce.number().positive().default(5000),
     maxConcurrentTasks: z.coerce.number().positive().default(3),
     taskTimeoutMs: z.coerce.number().positive().default(300000),
@@ -178,10 +167,11 @@ export const AppConfigSchema = z.object({
   }),
 });
 
-export type AppConfig = z.infer<typeof AppConfigSchema>;
-export type Language = AppConfig['review']['language'];
-export type AIConfig = AppConfig['ai'];
-export type GitLabConfig = AppConfig['gitlab'];
-export type WebhookEventsConfig = AppConfig['webhook'];
-export type ReviewConfig = AppConfig['review'];
-export type QueueConfig = AppConfig['queue'];
+export type DBConfig = z.infer<typeof DBConfigSchema>;
+
+export type Language = DBConfig['review']['language'];
+export type AIConfig = DBConfig['ai'];
+export type GitLabConfig = DBConfig['gitlab'];
+export type WebhookEventsConfig = DBConfig['webhook'];
+export type ReviewConfig = DBConfig['review'];
+export type QueueConfig = DBConfig['queue'];

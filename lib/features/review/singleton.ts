@@ -1,4 +1,4 @@
-import { getConfig } from '@/lib/features/config';
+import { getDBConfig } from '@/lib/features/config';
 import { GitLabClient } from '@/lib/features/gitlab/client';
 import { AICodeReviewRegistry } from '@/lib/features/ai';
 import { CopilotTokenStorage } from '@/lib/features/ai/github-copilot';
@@ -19,7 +19,7 @@ let reviewEngineInstance: ReviewEngine | null = null;
  */
 export async function getReviewEngine(): Promise<ReviewEngine> {
   if (!reviewEngineInstance) {
-    const config = await getConfig();
+    const config = await getDBConfig();
 
     // Create GitHub Copilot token storage
     const copilotTokenStorage = new CopilotTokenStorage(getCopilotTokenPath());

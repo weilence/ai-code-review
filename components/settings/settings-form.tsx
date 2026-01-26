@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateSettings } from '@/actions/config';
-import type { AppConfig } from '@/lib/features/config/schema';
+import type { DBConfig } from '@/lib/features/config/schema';
 import { cn } from '@/lib/utils';
 import { Loader2, Save } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
@@ -17,7 +17,7 @@ import {
 } from './sections';
 
 interface SettingsFormProps {
-  config: AppConfig;
+  config: DBConfig;
 }
 
 type FormStatus = 'idle' | 'saving' | 'success' | 'error';
@@ -44,68 +44,54 @@ export function SettingsForm({ config }: SettingsFormProps) {
     setErrorMessage('');
 
     try {
-      const values: Record<string, unknown> = {
-        // GitLab 配置
-        'gitlab.url': gitlabConfig.url?.trim() || 'https://gitlab.com',
-        'gitlab.token': gitlabConfig.token?.trim() || '',
-        'gitlab.webhookSecret': gitlabConfig.webhookSecret?.trim() || '',
-
-        // AI 配置 - 将模型配置字典转换为 JSON 存储
-        'ai.models': JSON.stringify(aiConfig.models || {}),
-
-        // Webhook 配置 - 保存为字符串，让 Zod schema 负责转换
-        'webhook.mr.enabled': webhookConfig.mr.enabled ? 'true' : 'false',
-        'webhook.mr.events':
-          typeof webhookConfig.mr.events === 'string'
-            ? webhookConfig.mr.events
-            : Array.isArray(webhookConfig.mr.events)
-              ? webhookConfig.mr.events.join(', ')
-              : 'open, update',
-        'webhook.mr.reviewDrafts': webhookConfig.mr.reviewDrafts ? 'true' : 'false',
-
-        'webhook.push.enabled': webhookConfig.push.enabled ? 'true' : 'false',
-        'webhook.push.branches':
-          typeof webhookConfig.push.branches === 'string'
-            ? webhookConfig.push.branches
-            : Array.isArray(webhookConfig.push.branches)
-              ? webhookConfig.push.branches.join(', ')
-              : '',
-
-        'webhook.note.enabled': webhookConfig.note.enabled ? 'true' : 'false',
-        'webhook.note.commands':
-          typeof webhookConfig.note.commands === 'string'
-            ? webhookConfig.note.commands
-            : Array.isArray(webhookConfig.note.commands)
-              ? webhookConfig.note.commands.join(', ')
-              : '/review, /ai-review',
-
-        // Review 配置
-        'review.maxFiles': reviewConfig.maxFiles ?? 50,
-        'review.maxLinesPerFile': reviewConfig.maxLinesPerFile ?? 1000,
-        'review.skipFiles':
-          typeof reviewConfig.skipFiles === 'string'
-            ? reviewConfig.skipFiles
-            : Array.isArray(reviewConfig.skipFiles)
-              ? reviewConfig.skipFiles.join(', ')
-              : '*.lock, *.min.js, *.min.css',
-        'review.language': reviewConfig.language || '简体中文',
-        'review.failureBehavior': reviewConfig.failureBehavior || 'non-blocking',
-        'review.failureThreshold': reviewConfig.failureThreshold || 'critical',
-
-        // Queue 配置
-        'queue.enabled': queueConfig.enabled ? 'true' : 'false',
-        'queue.pollingIntervalMs': queueConfig.pollingIntervalMs ?? 5000,
-        'queue.maxConcurrentTasks': queueConfig.maxConcurrentTasks ?? 3,
-        'queue.taskTimeoutMs': queueConfig.taskTimeoutMs ?? 300000,
-        'queue.maxRetries': queueConfig.maxRetries ?? 3,
-        'queue.retryBackoffMs': queueConfig.retryBackoffMs ?? 60000,
-        'queue.retryBackoffMultiplier': queueConfig.retryBackoffMultiplier ?? 2.0,
-        'queue.maxRetryBackoffMs': queueConfig.maxRetryBackoffMs ?? 600000,
-        'queue.cleanupIntervalMs': queueConfig.cleanupIntervalMs ?? 3600000,
-        'queue.retainCompletedDays': queueConfig.retainCompletedDays ?? 7,
+      // 新格式：直接传递分组对象
+      const groupedValues: Partial<DBConfig> = {
+        gitlab: {
+          url: gitlabConfig.url?.trim() || 'https://gitlab.com',
+          token: gitlabConfig.token?.trim() || '',
+          webhookSecret: gitlabConfig.webhookSecret?.trim() || '',
+        },
+        ai: {
+          models: aiConfig.models || {},
+        },
+        webhook: {
+          mr: {
+            enabled: webhookConfig.mr.enabled,
+            events: ensureArray(webhookConfig.mr.events),
+            reviewDrafts: webhookConfig.mr.reviewDrafts,
+          },
+          push: {
+            enabled: webhookConfig.push.enabled,
+            branches: ensureArray(webhookConfig.push.branches),
+          },
+          note: {
+            enabled: webhookConfig.note.enabled,
+            commands: ensureArray(webhookConfig.note.commands),
+          },
+        },
+        review: {
+          maxFiles: reviewConfig.maxFiles ?? 50,
+          maxLinesPerFile: reviewConfig.maxLinesPerFile ?? 1000,
+          skipFiles: ensureArray(reviewConfig.skipFiles),
+          language: reviewConfig.language,
+          failureBehavior: reviewConfig.failureBehavior ?? 'non-blocking',
+          failureThreshold: reviewConfig.failureThreshold ?? 'critical',
+        },
+        queue: {
+          enabled: queueConfig.enabled ?? true,
+          pollingIntervalMs: queueConfig.pollingIntervalMs ?? 5000,
+          maxConcurrentTasks: queueConfig.maxConcurrentTasks ?? 3,
+          taskTimeoutMs: queueConfig.taskTimeoutMs ?? 300000,
+          maxRetries: queueConfig.maxRetries ?? 3,
+          retryBackoffMs: queueConfig.retryBackoffMs ?? 60000,
+          retryBackoffMultiplier: queueConfig.retryBackoffMultiplier ?? 2.0,
+          maxRetryBackoffMs: queueConfig.maxRetryBackoffMs ?? 600000,
+          cleanupIntervalMs: queueConfig.cleanupIntervalMs ?? 3600000,
+          retainCompletedDays: queueConfig.retainCompletedDays ?? 7,
+        },
       };
 
-      const result = await updateSettings(values);
+      const result = await updateSettings(groupedValues);
 
       if (result.success) {
         setStatus('success');
@@ -120,6 +106,13 @@ export function SettingsForm({ config }: SettingsFormProps) {
       setErrorMessage(error instanceof Error ? error.message : '保存失败');
     }
   };
+
+  // 辅助函数：确保值为数组
+  function ensureArray(value: string[] | string | undefined): string[] {
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') return value.split(',').map(s => s.trim()).filter(Boolean);
+    return [];
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
