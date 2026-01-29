@@ -1,7 +1,3 @@
-/**
- * QueueManager - Singleton queue manager coordinating all components
- */
-
 import type { ReviewEngine } from '@/lib/features/review/engine';
 import type { QueueConfig, EnqueueOptions, QueueStats, WorkerStats } from './schema';
 import { TaskQueue } from './queue';
@@ -26,7 +22,6 @@ export class QueueManager {
     reviewEngine: ReviewEngine,
     private config: QueueConfig
   ) {
-    // Initialize components
     this.queue = new TaskQueue();
     this.retryHandler = new RetryHandler(config);
     this.executor = new TaskExecutor(reviewEngine, this.retryHandler);
@@ -38,9 +33,6 @@ export class QueueManager {
     this.scheduler = new TaskScheduler(this.queue, this.workerPool, config);
   }
 
-  /**
-   * Start the queue manager
-   */
   async start(): Promise<void> {
     if (this.isRunning) {
       logger.warn('Queue manager already running');
@@ -56,16 +48,10 @@ export class QueueManager {
 
     await this.scheduler.start();
 
-    // Register shutdown hooks
-    this.registerShutdownHooks();
-
     this.isRunning = true;
     logger.info('Queue manager started successfully');
   }
 
-  /**
-   * Stop the queue manager (graceful shutdown)
-   */
   async stop(): Promise<void> {
     if (!this.isRunning) {
       logger.warn('Queue manager not running');
@@ -80,9 +66,6 @@ export class QueueManager {
     logger.info('Queue manager stopped successfully');
   }
 
-  /**
-   * Enqueue a new review task
-   */
   async enqueue(options: EnqueueOptions): Promise<number> {
     logger.debug({ options }, 'Enqueueing task');
 
@@ -93,80 +76,36 @@ export class QueueManager {
     return taskId;
   }
 
-  /**
-   * Get queue statistics
-   */
   async getStats(): Promise<QueueStats> {
     return await this.scheduler.getStats();
   }
 
-  /**
-   * Get worker statistics
-   */
   getWorkerStats(): WorkerStats {
     return this.workerPool.getStats();
   }
 
-  /**
-   * Check if queue manager is running
-   */
   isActive(): boolean {
     return this.isRunning;
   }
 
-  /**
-   * Get configuration
-   */
   get queueConfig(): QueueConfig {
     return this.config;
   }
-
-  /**
-   * Register process shutdown hooks
-   */
-  private registerShutdownHooks(): void {
-    const shutdown = async (signal: string) => {
-      logger.info({ signal }, 'Received shutdown signal');
-      await this.stop();
-      process.exit(0);
-    };
-
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
-    process.on('SIGINT', () => shutdown('SIGINT'));
-  }
 }
-
-// ============================================================================
-// Singleton Instance
-// ============================================================================
-
-let managerInstance: QueueManager | null = null;
 
 export async function getQueueManager(): Promise<QueueManager> {
-  if (!managerInstance) {
-    // Lazy initialization
-    // Import here to avoid circular dependencies
-    const { getReviewEngine } = await import('@/lib/features/review/singleton');
-    const { getDBConfig } = await import('@/lib/features/config');
-
-    const reviewEngine = await getReviewEngine();
-    const config = await getDBConfig();
-
-    managerInstance = new QueueManager(reviewEngine, config.queue);
-
-    logger.info('Queue manager singleton created');
+  if (!globalThis.__QUEUE_MANAGER__) {
+    throw new Error(
+      'QueueManager has not been initialized. Make sure the server is running.',
+    );
   }
 
-  return managerInstance;
+  return globalThis.__QUEUE_MANAGER__;
 }
 
-/**
- * Reset queue manager (mainly for testing)
- */
 export function resetQueueManager(): void {
-  if (managerInstance && managerInstance.isActive()) {
-    managerInstance.stop();
+  if (globalThis.__QUEUE_MANAGER__) {
+    globalThis.__QUEUE_MANAGER__.stop();
   }
-  managerInstance = null;
-  logger.info('Queue manager singleton reset');
+  globalThis.__QUEUE_MANAGER__ = undefined;
 }

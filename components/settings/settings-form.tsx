@@ -73,6 +73,8 @@ export function SettingsForm({ config }: SettingsFormProps) {
           maxFiles: reviewConfig.maxFiles ?? 50,
           maxLinesPerFile: reviewConfig.maxLinesPerFile ?? 1000,
           skipFiles: ensureArray(reviewConfig.skipFiles),
+          inlineComments: reviewConfig.inlineComments ?? true,
+          summaryComment: reviewConfig.summaryComment ?? true,
           language: reviewConfig.language,
           failureBehavior: reviewConfig.failureBehavior ?? 'non-blocking',
           failureThreshold: reviewConfig.failureThreshold ?? 'critical',

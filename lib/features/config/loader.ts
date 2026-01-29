@@ -5,17 +5,9 @@ import { createLogger } from '@/lib/utils/logger';
 
 const logger = createLogger('config-loader');
 
-// ============================================================================
-// Config Operations
-// ============================================================================
-
-/**
- * 获取数据库配置
- * 每次调用时从数据库重新加载，不使用缓存
- */
 export async function getDBConfig(): Promise<DBConfig> {
   try {
-    const db = getDb();
+    const db = await getDb();
     const allSettings = await db.select().from(settings);
 
     const groupedConfig: Record<string, unknown> = {};
@@ -35,14 +27,10 @@ export async function getDBConfig(): Promise<DBConfig> {
   }
 }
 
-/**
- * 设置数据库配置
- * 使用批量插入 + onConflictDoUpdate 实现批量更新
- */
 export async function setDBConfig(
   grouped: Partial<DBConfig>
 ): Promise<void> {
-  const db = getDb();
+  const db = await getDb();
 
   const categories = Object.keys(grouped);
   if (categories.length === 0) return;
@@ -55,7 +43,6 @@ export async function setDBConfig(
     updatedAt: now,
   }));
 
-  // 批量插入，如果 key 冲突则更新
   await db.insert(settings).values(values)
     .onConflictDoUpdate({
       target: settings.key,

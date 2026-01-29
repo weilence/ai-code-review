@@ -43,7 +43,7 @@ export class TaskExecutor {
       // Note: ReviewEngine.reviewMergeRequest will call this internally
       // We just need to create the review record first
 
-      const db = getDb();
+      const db = await getDb();
 
       // Create reviews record (status=running)
       // If this is a retry, there might be a reviewId already

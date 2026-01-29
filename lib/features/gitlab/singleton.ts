@@ -1,28 +1,15 @@
-import { getDBConfig } from '@/lib/features/config';
-import { GitLabClient } from './client';
+import type { GitLabClient } from './client';
 
-/**
- * GitLab Client Singleton
- *
- * Manages a single instance of GitLabClient for the application lifetime.
- */
-let gitlabClientInstance: GitLabClient | null = null;
-
-/**
- * Get or create the GitLabClient singleton
- */
 export async function getGitLabClient(): Promise<GitLabClient> {
-  if (!gitlabClientInstance) {
-    const config = await getDBConfig();
-    gitlabClientInstance = new GitLabClient(config.gitlab);
+  if (!globalThis.__GITLAB_CLIENT__) {
+    throw new Error(
+      'GitLabClient has not been initialized. Make sure the server is running.',
+    );
   }
 
-  return gitlabClientInstance;
+  return globalThis.__GITLAB_CLIENT__;
 }
 
-/**
- * Reset the GitLabClient singleton (mainly for testing)
- */
 export function resetGitLabClient(): void {
-  gitlabClientInstance = null;
+  globalThis.__GITLAB_CLIENT__ = undefined;
 }

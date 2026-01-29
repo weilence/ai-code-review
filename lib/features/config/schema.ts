@@ -1,50 +1,20 @@
 import { z } from 'zod';
 
-// ============================================================================
-// AI Model Config
-// ============================================================================
-
-/**
- * 单个 AI 模型的配置
- * 参考 models.dev 的格式，使用 provider:model-id 作为唯一标识
- */
 const AIModelConfigSchema = z.object({
-  // 提供商（从 model id 中解析，但也支持显式指定）
   provider: z.string().default('anthropic'),
-
-  // API 认证
   apiKey: z.string().optional(),
   baseUrl: z.string().optional(),
-
-  // 模型参数
   temperature: z.coerce.number().min(0).max(2).optional(),
   maxTokens: z.coerce.number().positive().optional(),
 });
 
 export type AIModelConfig = z.infer<typeof AIModelConfigSchema>;
 
-/**
- * AI 模型配置的 Zod schema
- * 新格式直接使用对象，不再需要 JSON 字符串解析
- */
 const AIModelsSchema = z.record(z.string(), AIModelConfigSchema);
 
-// ============================================================================
-// Helper Schemas
-// ============================================================================
-
-// 辅助函数：定义数组类型
 const arrayField = (defaultValue: string[]) =>
   z.array(z.string()).default(defaultValue);
 
-// ============================================================================
-// System Config Schema (环境变量配置)
-// ============================================================================
-
-/**
- * 系统级配置 Schema（从环境变量读取）
- * 只包含服务器启动时的基础配置
- */
 export const SystemConfigSchema = z.object({
   port: z.coerce.number().positive().default(3000),
   host: z.string().default('0.0.0.0'),
@@ -52,16 +22,7 @@ export const SystemConfigSchema = z.object({
 
 export type SystemConfig = z.infer<typeof SystemConfigSchema>;
 
-// ============================================================================
-// Database Config Schema (数据库配置)
-// ============================================================================
-
-/**
- * 数据库配置 Schema（从数据库读取）
- * 包含所有业务配置
- */
 export const DBConfigSchema = z.object({
-  // GitLab config
   gitlab: z.object({
     url: z.string().default('https://gitlab.com'),
     token: z.string().default(''),
@@ -72,10 +33,7 @@ export const DBConfigSchema = z.object({
     webhookSecret: '',
   }),
 
-  // AI config
   ai: z.object({
-    // 模型配置字典：key 是 "provider:model-id"，value 是模型配置
-    // 例如：{ "anthropic:claude-sonnet-4-5": { provider: "anthropic", apiKey: "...", temperature: 0.7 } }
     models: AIModelsSchema.default({
       'anthropic:claude-sonnet-4-5': {
         provider: 'anthropic',
@@ -89,7 +47,6 @@ export const DBConfigSchema = z.object({
     },
   }),
 
-  // Webhook config
   webhook: z.object({
     mr: z.object({
       enabled: z.boolean().default(true),
@@ -110,7 +67,6 @@ export const DBConfigSchema = z.object({
     note: { enabled: true, commands: ['/review', '/ai-review'] },
   }),
 
-  // Review config
   review: z.object({
     maxFiles: z.coerce.number().positive().default(50),
     maxLinesPerFile: z.coerce.number().positive().default(1000),
@@ -130,7 +86,6 @@ export const DBConfigSchema = z.object({
     failureThreshold: 'critical',
   }),
 
-  // Log config
   log: z.object({
     level: z.string().optional().transform(s => {
       if (!s) return 'info';
@@ -141,7 +96,6 @@ export const DBConfigSchema = z.object({
     }),
   }).default({ level: 'info' }),
 
-  // Queue config
   queue: z.object({
     enabled: z.boolean().default(true),
     pollingIntervalMs: z.coerce.number().positive().default(5000),
@@ -165,6 +119,17 @@ export const DBConfigSchema = z.object({
     cleanupIntervalMs: 3600000,
     retainCompletedDays: 7,
   }),
+
+  copilot: z.object({
+    refreshToken: z.string().default(''),
+    accessToken: z.string().optional(),
+    accessTokenExpiresAt: z.coerce.number().optional(),
+    baseUrl: z.string().default('https://api.githubcopilot.com'),
+    enterpriseUrl: z.string().optional(),
+  }).default({
+    refreshToken: '',
+    baseUrl: 'https://api.githubcopilot.com',
+  }),
 });
 
 export type DBConfig = z.infer<typeof DBConfigSchema>;
@@ -175,3 +140,4 @@ export type GitLabConfig = DBConfig['gitlab'];
 export type WebhookEventsConfig = DBConfig['webhook'];
 export type ReviewConfig = DBConfig['review'];
 export type QueueConfig = DBConfig['queue'];
+export type CopilotConfig = DBConfig['copilot'];

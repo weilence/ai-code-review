@@ -8,10 +8,6 @@ import type { DBConfig } from '@/lib/features/config/schema';
 
 const logger = createLogger('settings-actions');
 
-// ============================================================================
-// Get Settings
-// ============================================================================
-
 export async function getAllSettings() {
   try {
     const config = await getDBConfig();
@@ -29,10 +25,6 @@ export async function getAllSettings() {
     };
   }
 }
-
-// ============================================================================
-// Update Settings
-// ============================================================================
 
 export async function updateSettings(values: Partial<DBConfig>) {
   try {
@@ -55,13 +47,9 @@ export async function updateSettings(values: Partial<DBConfig>) {
   }
 }
 
-// ============================================================================
-// Reset Settings
-// ============================================================================
-
 export async function resetSettingsToDefaults() {
   try {
-    const db = getDb();
+    const db = await getDb();
 
     await db.delete(settings);
 
@@ -79,10 +67,6 @@ export async function resetSettingsToDefaults() {
     };
   }
 }
-
-// ============================================================================
-// Export Settings
-// ============================================================================
 
 export async function exportSettings() {
   try {
@@ -104,10 +88,6 @@ export async function exportSettings() {
     };
   }
 }
-
-// ============================================================================
-// Import Settings
-// ============================================================================
 
 export async function importSettings(data: Record<string, unknown>) {
   try {

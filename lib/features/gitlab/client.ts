@@ -50,7 +50,7 @@ export class GitLabClient {
 
     const note = await this.api.MergeRequestNotes.create(projectId, mrIid, body);
 
-    return note
+    return note;
   }
 
   async postDiscussion(
@@ -143,7 +143,7 @@ export class GitLabClient {
 
     const note = await this.api.MergeRequestNotes.edit(projectId, mrIid, noteId, { body });
 
-    return note
+    return note;
   }
 
   async setCommitStatus(
@@ -165,41 +165,17 @@ export class GitLabClient {
     });
   }
 
-  /**
-   * 通过项目路径获取项目信息
-   * @param projectPath - 项目路径，例如 "wei.luo/scripts-tool" 或 "namespace/project"
-   * @returns 项目信息，如果未找到则返回 null
-   */
   async getProjectByPath(
     projectPath: string
   ): Promise<{ id: number; path_with_namespace: string; name: string } | null> {
-    try {
-      logger.debug({ projectPath }, 'Fetching project by path');
+    logger.debug({ projectPath }, 'Fetching project by path');
 
-      // @gitbeaker/rest 会自动进行 URL 编码，不需要手动编码
-      const project = await this.api.Projects.show(projectPath);
+    const project = await this.api.Projects.show(projectPath);
 
-      return {
-        id: project.id,
-        path_with_namespace: project.path_with_namespace as string,
-        name: project.name,
-      };
-    } catch (error) {
-      // 详细的错误日志
-      logger.error({
-        projectPath,
-        errorMessage: error instanceof Error ? error.message : String(error),
-        errorName: error instanceof Error ? error.name : undefined,
-        causeDescription: error instanceof Error && error.cause && typeof error.cause === 'object'
-          ? 'description' in error.cause ? String(error.cause.description) : undefined
-          : undefined,
-        responseStatus: error instanceof Error && error.cause && typeof error.cause === 'object' && 'response' in error.cause
-          ? // @ts-expect-error - accessing known property from error cause
-          error.cause.response?.status
-          : undefined,
-      }, 'Failed to fetch project from GitLab');
-
-      return null;
-    }
+    return {
+      id: project.id,
+      path_with_namespace: project.path_with_namespace as string,
+      name: project.name,
+    };
   }
 }

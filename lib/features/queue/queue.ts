@@ -1,7 +1,3 @@
-/**
- * TaskQueue - Queue operations (enqueue, dequeue, lock management)
- */
-
 import { eq, and, sql, count } from 'drizzle-orm';
 import { getDb, reviewQueue, type QueueTask, type NewQueueTask } from '@/lib/db';
 import type { EnqueueOptions } from './schema';
@@ -10,18 +6,11 @@ import { createLogger } from '@/lib/utils/logger';
 const logger = createLogger('task-queue');
 
 export class TaskQueue {
-  private db = getDb();
-
-  /**
-   * Enqueue a new review task
-   * - Checks for duplicate pending tasks for the same MR
-   * - Creates a new queue record with status='pending'
-   */
   async enqueue(options: EnqueueOptions): Promise<number> {
+    const db = await getDb();
     const projectId = String(options.projectId);
 
-    // Check for existing pending task for the same MR
-    const existing = await this.db
+    const existing = await db
       .select()
       .from(reviewQueue)
       .where(
@@ -41,7 +30,6 @@ export class TaskQueue {
       return existing[0].id;
     }
 
-    // Create new task
     const now = new Date();
     const newTask: NewQueueTask = {
       projectId,
@@ -58,11 +46,12 @@ export class TaskQueue {
       triggeredBy: options.triggeredBy,
       triggerEvent: options.triggerEvent,
       webhookEventId: options.webhookEventId,
+      reviewId: options.reviewId,
       createdAt: now,
       updatedAt: now,
     };
 
-    const [task] = await this.db.insert(reviewQueue).values(newTask).returning();
+    const [task] = await db.insert(reviewQueue).values(newTask).returning();
 
     logger.info(
       { taskId: task.id, projectId, mrIid: options.mrIid, priority: task.priority },
@@ -72,19 +61,12 @@ export class TaskQueue {
     return task.id;
   }
 
-  /**
-   * Dequeue next available task
-   * - Uses row-level locking (UPDATE + RETURNING)
-   * - Filters by: status='pending', scheduledAt <= now
-   * - Orders by: priority ASC, createdAt ASC
-   * - Sets: lockedAt, lockedBy, status='running'
-   */
   async dequeue(workerId: string): Promise<QueueTask | null> {
+    const db = await getDb();
     const now = Date.now();
 
     try {
-      // Find next task to process
-      const tasks = await this.db
+      const tasks = await db
         .select()
         .from(reviewQueue)
         .where(eq(reviewQueue.status, 'pending'))
@@ -92,13 +74,12 @@ export class TaskQueue {
         .limit(1);
 
       if (!tasks || tasks.length === 0) {
-        return null; // No tasks available
+        return null;
       }
 
       const task = tasks[0];
 
-      // Lock the task
-      await this.db
+      await db
         .update(reviewQueue)
         .set({
           status: 'running',
@@ -120,11 +101,9 @@ export class TaskQueue {
     }
   }
 
-  /**
-   * Release task lock (for timeout recovery)
-   */
   async releaseLock(taskId: number, workerId: string): Promise<void> {
-    await this.db
+    const db = await getDb();
+    await db
       .update(reviewQueue)
       .set({
         status: 'pending',
@@ -137,11 +116,9 @@ export class TaskQueue {
     logger.info({ taskId, workerId }, 'Task lock released');
   }
 
-  /**
-   * Cancel a pending task
-   */
   async cancelTask(taskId: number): Promise<boolean> {
-    await this.db
+    const db = await getDb();
+    await db
       .update(reviewQueue)
       .set({
         status: 'cancelled',
@@ -153,11 +130,9 @@ export class TaskQueue {
     return true;
   }
 
-  /**
-   * Mark task as completed
-   */
   async markCompleted(taskId: number, reviewId: number, durationMs: number): Promise<void> {
-    await this.db
+    const db = await getDb();
+    await db
       .update(reviewQueue)
       .set({
         status: 'completed',
@@ -169,9 +144,6 @@ export class TaskQueue {
     logger.info({ taskId, reviewId, durationMs }, 'Task marked as completed');
   }
 
-  /**
-   * Mark task as failed and schedule retry if eligible
-   */
   async markFailed(
     taskId: number,
     error: Error,
@@ -194,17 +166,16 @@ export class TaskQueue {
     };
 
     if (nextRetryAt) {
-      // Schedule for retry
       updateData.status = 'pending';
       updateData.nextRetryAt = nextRetryAt;
       updateData.lockedAt = null;
       updateData.lockedBy = null;
     } else {
-      // Permanently failed
       updateData.status = 'failed';
     }
 
-    await this.db.update(reviewQueue).set(updateData).where(eq(reviewQueue.id, taskId));
+    const db = await getDb();
+    await db.update(reviewQueue).set(updateData).where(eq(reviewQueue.id, taskId));
 
     logger.info(
       { taskId, errorType: error.constructor.name, nextRetryAt },
@@ -212,11 +183,9 @@ export class TaskQueue {
     );
   }
 
-  /**
-   * Get pending tasks count
-   */
   async getPendingCount(): Promise<number> {
-    const [result] = await this.db
+    const db = await getDb();
+    const [result] = await db
       .select({ value: count() })
       .from(reviewQueue)
       .where(eq(reviewQueue.status, 'pending'));
@@ -224,13 +193,11 @@ export class TaskQueue {
     return result?.value || 0;
   }
 
-  /**
-   * Get stuck tasks (locked but timeout exceeded)
-   */
   async getStuckTasks(timeoutMs: number): Promise<QueueTask[]> {
+    const db = await getDb();
     const timeoutThreshold = Date.now() - timeoutMs;
 
-    return await this.db
+    return await db
       .select()
       .from(reviewQueue)
       .where(
@@ -241,13 +208,11 @@ export class TaskQueue {
       );
   }
 
-  /**
-   * Requeue stuck tasks (reset lock and status)
-   */
   async requeueStuckTasks(timeoutMs: number): Promise<number> {
+    const db = await getDb();
     const timeoutThreshold = Date.now() - timeoutMs;
 
-    await this.db
+    await db
       .update(reviewQueue)
       .set({
         status: 'pending',
@@ -262,22 +227,18 @@ export class TaskQueue {
         )
       );
 
-    // Count affected rows
-    const stuckTasks = await this.getStuckTasks(timeoutMs);
-    const count = stuckTasks.length;
+  const stuckTasks = await this.getStuckTasks(timeoutMs);
+  const count = stuckTasks.length;
 
     logger.info({ count }, 'Stuck tasks requeued');
     return count;
   }
 
-  /**
-   * Cleanup old completed tasks
-   */
   async cleanupOldTasks(retainDays: number): Promise<number> {
+    const db = await getDb();
     const cutoffDate = new Date(Date.now() - retainDays * 24 * 60 * 60 * 1000);
 
-    // First, count how many will be deleted
-    const tasksToDelete = await this.db
+    const tasksToDelete = await db
       .select()
       .from(reviewQueue)
       .where(
@@ -289,8 +250,7 @@ export class TaskQueue {
 
     const count = tasksToDelete.length;
 
-    // Delete them
-    await this.db
+    await db
       .delete(reviewQueue)
       .where(
         and(
@@ -303,11 +263,9 @@ export class TaskQueue {
     return count;
   }
 
-  /**
-   * Get queue statistics
-   */
   async getStats(): Promise<{ pending: number; running: number; completed: number; failed: number }> {
-    const stats = await this.db
+    const db = await getDb();
+    const stats = await db
       .select({
         status: reviewQueue.status,
         count: count(),

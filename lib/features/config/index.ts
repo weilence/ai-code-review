@@ -21,4 +21,5 @@ export type {
   WebhookEventsConfig,
   ReviewConfig,
   QueueConfig,
+  CopilotConfig,
 } from './schema';

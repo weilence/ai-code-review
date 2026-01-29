@@ -6,23 +6,17 @@ import { createLogger } from '@/lib/utils/logger';
 
 const logger = createLogger('review-actions');
 
-// ============================================================================
-// Get Reviews
-// ============================================================================
-
 export async function getReviews(options?: {
   status?: 'pending' | 'running' | 'completed' | 'failed';
   limit?: number;
   offset?: number;
 }) {
   try {
-    const db = getDb();
+    const db = await getDb();
     const { status, limit = 50, offset = 0 } = options || {};
 
-    // 构建查询条件
     const whereCondition = status ? eq(reviews.status, status) : undefined;
 
-    // 执行主查询
     const itemsQuery = db
       .select()
       .from(reviews)
@@ -34,7 +28,6 @@ export async function getReviews(options?: {
       ? await itemsQuery.where(whereCondition)
       : await itemsQuery;
 
-    // 执行计数查询
     const countQuery = db.select({ value: count() }).from(reviews);
     const [{ value: total }] = whereCondition
       ? await countQuery.where(whereCondition)
@@ -58,7 +51,7 @@ export async function getReviews(options?: {
 
 export async function getReview(id: number) {
   try {
-    const db = getDb();
+    const db = await getDb();
 
     const review = await db.select().from(reviews).where(eq(reviews.id, id)).limit(1);
 
@@ -84,7 +77,7 @@ export async function getReview(id: number) {
 
 export async function getReviewByMr(projectId: string, mrIid: number) {
   try {
-    const db = getDb();
+    const db = await getDb();
 
     const review = await db
       .select()
@@ -106,13 +99,9 @@ export async function getReviewByMr(projectId: string, mrIid: number) {
   }
 }
 
-// ============================================================================
-// Get Review Logs
-// ============================================================================
-
 export async function getReviewLogs(reviewId: number) {
   try {
-    const db = getDb();
+    const db = await getDb();
 
     const logs = await db
       .select()
@@ -133,14 +122,6 @@ export async function getReviewLogs(reviewId: number) {
   }
 }
 
-// ============================================================================
-// Legacy Helper Functions (向后兼容)
-// ============================================================================
-
-/**
- * 获取最新的审查结果（向后兼容）
- * @deprecated 使用 getReviewLogs 代替
- */
 export async function getReviewResults(reviewId: number) {
   const result = await getReviewLogs(reviewId);
 
@@ -152,7 +133,6 @@ export async function getReviewResults(reviewId: number) {
     };
   }
 
-  // 找到最新的 result 类型日志
   const latestResult = result.data.find(log => log.logType === 'result');
 
   return {
@@ -161,10 +141,6 @@ export async function getReviewResults(reviewId: number) {
   };
 }
 
-/**
- * 获取审查错误列表（向后兼容）
- * @deprecated 使用 getReviewLogs 代替
- */
 export async function getReviewErrors(reviewId: number) {
   const result = await getReviewLogs(reviewId);
 
@@ -176,7 +152,6 @@ export async function getReviewErrors(reviewId: number) {
     };
   }
 
-  // 过滤出所有 error 类型日志
   const errors = result.data.filter(log => log.logType === 'error');
 
   return {
@@ -185,15 +160,10 @@ export async function getReviewErrors(reviewId: number) {
   };
 }
 
-// ============================================================================
-// Trigger Manual Review
-// ============================================================================
-
 export async function triggerManualReview(projectId: number, mrIid: number) {
   try {
     logger.info({ projectId, mrIid }, 'Triggering manual review');
 
-    // Use queue system
     const { getQueueManager } = await import('@/lib/features/queue/singleton');
     const { GitLabClient } = await import('@/lib/features/gitlab/client');
     const { getDBConfig } = await import('@/lib/features/config');
@@ -201,14 +171,12 @@ export async function triggerManualReview(projectId: number, mrIid: number) {
     const queueManager = await getQueueManager();
     const config = await getDBConfig();
 
-    // Get MR information from GitLab
     const gitlabClient = new GitLabClient(config.gitlab);
     const mrChanges = await gitlabClient.getMergeRequestChanges(
       projectId,
       mrIid
     );
 
-    // Enqueue task
     const taskId = await queueManager.enqueue({
       projectId,
       mrIid,
@@ -219,7 +187,7 @@ export async function triggerManualReview(projectId: number, mrIid: number) {
       sourceBranch: mrChanges.sourceBranch,
       targetBranch: mrChanges.targetBranch,
       triggeredBy: 'manual',
-      priority: 3, // Higher priority for manual triggers
+      priority: 3,
     });
 
     return {
@@ -236,13 +204,9 @@ export async function triggerManualReview(projectId: number, mrIid: number) {
   }
 }
 
-// ============================================================================
-// Retry Failed Review
-// ============================================================================
-
 export async function retryReview(reviewId: number) {
   try {
-    const db = getDb();
+    const db = await getDb();
 
     const review = await db.select().from(reviews).where(eq(reviews.id, reviewId)).limit(1);
 
@@ -264,11 +228,9 @@ export async function retryReview(reviewId: number) {
 
     logger.info({ reviewId }, 'Retrying failed review');
 
-    // Use queue system
     const { getQueueManager } = await import('@/lib/features/queue/singleton');
     const queueManager = await getQueueManager();
 
-    // Enqueue as a retry task
     const taskId = await queueManager.enqueue({
       projectId: Number(reviewData.projectId),
       mrIid: reviewData.mrIid,
@@ -279,10 +241,10 @@ export async function retryReview(reviewId: number) {
       sourceBranch: reviewData.sourceBranch,
       targetBranch: reviewData.targetBranch,
       triggeredBy: 'manual',
-      priority: 1, // Highest priority for retries
+      priority: 1,
+      reviewId, // 关联原有 review 记录
     });
 
-    // 立即返回成功
     return {
       success: true,
       data: { taskId },
@@ -297,13 +259,9 @@ export async function retryReview(reviewId: number) {
   }
 }
 
-// ============================================================================
-// Get Review Statistics
-// ============================================================================
-
 export async function getReviewStatistics() {
   try {
-    const db = getDb();
+    const db = await getDb();
 
     const stats = await db
       .select({
@@ -323,7 +281,6 @@ export async function getReviewStatistics() {
     const completedReviews = totalByStatus['completed'] || 0;
     const successRate = totalReviews > 0 ? (completedReviews / totalReviews) * 100 : 0;
 
-    // 获取最近的审查
     const recentReviews = await db
       .select()
       .from(reviews)
@@ -348,13 +305,9 @@ export async function getReviewStatistics() {
   }
 }
 
-// ============================================================================
-// Delete Review
-// ============================================================================
-
 export async function deleteReview(id: number) {
   try {
-    const db = getDb();
+    const db = await getDb();
 
     await db.delete(reviews).where(eq(reviews.id, id));
 
@@ -375,7 +328,7 @@ export async function deleteReview(id: number) {
 
 export async function clearAllReviews() {
   try {
-    const db = getDb();
+    const db = await getDb();
 
     await db.delete(reviews);
 

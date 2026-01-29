@@ -44,12 +44,6 @@ COPY --from=build /app/public ./public
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 
-# 复制数据库相关文件
-COPY --from=build /app/drizzle.config.ts ./drizzle.config.ts
-COPY --from=build /app/lib/db ./lib/db
-COPY --from=build /app/scripts ./scripts
-COPY --from=build /app/package.json ./package.json
-
 # 修复文件权限：将所有复制的文件改为 bun 用户所有
 RUN chown -R bun:bun /app
 

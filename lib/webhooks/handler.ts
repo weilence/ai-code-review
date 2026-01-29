@@ -16,12 +16,7 @@ import {
 
 const logger = createLogger('webhook-handler');
 
-/**
- * Check if a webhook should be ignored before processing
- * Returns the reason to ignore, or undefined if not ignored
- */
 function shouldIgnoreWebhook(webhook: GitLabWebhook): string | undefined {
-  // Ignore AI-generated comments to prevent database clutter
   if (isNoteWebhook(webhook)) {
     const { object_attributes } = webhook;
     if (object_attributes.note?.includes(AI_COMMENT_MARKER)) {
@@ -39,9 +34,6 @@ export interface WebhookResponse {
   details?: Record<string, unknown>;
 }
 
-/**
- * Create the main webhook handler
- */
 export async function handleWebhook(deps: {
   webhookSecret: string;
   eventsConfig: WebhookEventsConfig;
@@ -50,23 +42,19 @@ export async function handleWebhook(deps: {
   const requestId = crypto.randomUUID();
 
   try {
-    // Get headers
     const token = deps.request.headers.get('X-Gitlab-Token');
     const eventType = deps.request.headers.get('X-Gitlab-Event');
 
     logger.info({ requestId, eventType }, 'Received webhook request');
 
-    // Verify signature
     verifyWebhookSignature({
       secret: deps.webhookSecret,
       token,
       eventType: eventType || undefined,
     });
 
-    // Parse body
     const body = await deps.request.json() as GitLabWebhook;
 
-    // Validate required webhook fields
     if (!body.object_kind) {
       logger.warn({ body }, 'Invalid webhook: missing object_kind');
       return {
@@ -83,7 +71,6 @@ export async function handleWebhook(deps: {
       };
     }
 
-    // Validate that the event type is supported
     if (!SUPPORTED_EVENT_TYPES.includes(body.object_kind)) {
       logger.warn({ objectKind: body.object_kind }, 'Unsupported object_kind');
       return {
@@ -93,7 +80,6 @@ export async function handleWebhook(deps: {
       };
     }
 
-    // Check if webhook should be ignored before logging to database
     const ignoreReason = shouldIgnoreWebhook(body);
     if (ignoreReason) {
       logger.debug({ requestId, ignoreReason }, 'Ignoring webhook before database logging');
@@ -105,8 +91,7 @@ export async function handleWebhook(deps: {
       };
     }
 
-    // Log webhook to database
-    const db = getDb();
+    const db = await getDb();
     const webhookRecord = await db.insert(webhooks).values({
       objectKind: body.object_kind,
       payload: body,
@@ -115,7 +100,6 @@ export async function handleWebhook(deps: {
 
     const webhookEventId = webhookRecord[0]?.id;
 
-    // Validate event type
     if (!eventType || !SUPPORTED_EVENT_TYPES.includes(body.object_kind)) {
       logger.debug(
         { eventType, objectKind: body.object_kind },
@@ -130,7 +114,6 @@ export async function handleWebhook(deps: {
       };
     }
 
-    // Extract metadata for logging
     const meta = extractWebhookMeta(body, requestId);
 
     logger.info(
@@ -138,7 +121,6 @@ export async function handleWebhook(deps: {
       'Processing webhook',
     );
 
-    // Route to appropriate handler
     let result: WebhookResponse;
 
     if (isMergeRequestWebhook(body)) {
@@ -216,9 +198,6 @@ export async function handleWebhook(deps: {
   }
 }
 
-/**
- * Export event handlers for direct use
- */
 export { handleMergeRequestEvent } from './events/merge-request';
 export { handleNoteEvent } from './events/note';
 export { handlePushEvent } from './events/push';

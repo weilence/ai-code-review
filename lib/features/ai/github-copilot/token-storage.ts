@@ -1,16 +1,10 @@
 import { createLogger } from '@/lib/utils/logger';
 import { getCopilotAuthClient } from './client';
-import { promises as fs } from 'fs';
-import path from 'path';
+import { getDBConfig, setDBConfig, type CopilotConfig } from '@/lib/features/config';
 
 const logger = createLogger('copilot-token');
 
-interface StoredToken {
-  refreshToken: string;
-  accessToken: string | null;
-  accessTokenExpiresAt: number | null;
-  metadata: Record<string, unknown>;
-}
+const REFRESH_BUFFER_SECONDS = 300;
 
 export interface CopilotCredentials {
   apiKey: string;
@@ -18,87 +12,79 @@ export interface CopilotCredentials {
 }
 
 export class CopilotTokenStorage {
-  private readonly filePath: string;
-  private readonly refreshBufferMs: number;
-
-  constructor(filePath: string, refreshBufferSeconds = 300) {
-    this.filePath = filePath;
-    this.refreshBufferMs = refreshBufferSeconds * 1000;
-  }
+  private configCache: CopilotConfig | null = null;
 
   async set(refreshToken: string, metadata: Record<string, unknown>): Promise<void> {
-    const token: StoredToken = {
+    const config = await this.getConfig();
+    const updated: Partial<CopilotConfig> = {
       refreshToken,
-      accessToken: null,
-      accessTokenExpiresAt: null,
-      metadata,
+      accessToken: undefined,
+      accessTokenExpiresAt: undefined,
+      baseUrl: metadata.baseUrl as string || config?.baseUrl || 'https://api.githubcopilot.com',
+      enterpriseUrl: metadata.enterpriseUrl as string | undefined,
     };
 
-    await this.save(token);
+    await this.updateConfig(updated);
     logger.info('Stored refresh token');
   }
 
   async get(): Promise<CopilotCredentials | null> {
-    let token = await this.load();
+    const config = await this.getConfig();
 
-    if (!token) {
+    if (!config?.refreshToken) {
       return null;
     }
 
-    const needsRefresh = !token.accessToken
-      || !token.accessTokenExpiresAt
-      || Date.now() >= token.accessTokenExpiresAt - this.refreshBufferMs;
+    const needsRefresh = !config.accessToken
+      || !config.accessTokenExpiresAt
+      || Date.now() >= config.accessTokenExpiresAt - (REFRESH_BUFFER_SECONDS * 1000);
 
     if (needsRefresh) {
-      const refreshed = await this.refresh(token);
+      const refreshed = await this.refresh(config);
 
       if (!refreshed) {
         return null;
       }
 
-      token = refreshed;
+      return { apiKey: refreshed.accessToken, baseURL: refreshed.baseUrl };
     }
 
-    if (!token.accessToken) {
+    if (!config.accessToken) {
       return null;
     }
 
-    return { apiKey: token.accessToken, baseURL: token.metadata.baseUrl as string };
+    return { apiKey: config.accessToken, baseURL: config.baseUrl };
   }
 
-  private async load(): Promise<StoredToken | null> {
-    try {
-      const content = await fs.readFile(this.filePath, 'utf-8');
-
-      if (content && content !== 'null') {
-        return JSON.parse(content) as StoredToken;
-      }
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        logger.error({ error }, 'Failed to load token');
-      }
+  private async getConfig(): Promise<CopilotConfig | null> {
+    if (this.configCache) {
+      return this.configCache;
     }
 
-    return null;
+    const dbConfig = await getDBConfig();
+    this.configCache = dbConfig.copilot;
+    return this.configCache;
   }
 
-  private async refresh(token: StoredToken): Promise<StoredToken | null> {
+  private async refresh(config: CopilotConfig): Promise<{ accessToken: string; baseUrl: string } | null> {
     try {
       const client = getCopilotAuthClient({
-        enterpriseUrl: token.metadata.enterpriseUrl as string | undefined,
+        enterpriseUrl: config.enterpriseUrl,
       });
-      const { token: accessToken, expires_at } = await client.getCopilotToken(token.refreshToken);
+      const { token: accessToken, expires_at } = await client.getCopilotToken(config.refreshToken);
 
-      const refreshed: StoredToken = {
-        ...token,
+      const updated: Partial<CopilotConfig> = {
         accessToken,
-        accessTokenExpiresAt: (expires_at * 1000),
+        accessTokenExpiresAt: expires_at * 1000,
       };
 
-      await this.save(refreshed);
+      await this.updateConfig(updated);
+
+      this.configCache = null;
+
       logger.info({ expiresInMinutes: Math.floor(((expires_at * 1000) - Date.now()) / 60000) }, 'Token refreshed');
 
-      return refreshed;
+      return { accessToken, baseUrl: config.baseUrl };
     } catch (error) {
       logger.error({ error }, 'Failed to refresh token');
 
@@ -106,11 +92,17 @@ export class CopilotTokenStorage {
     }
   }
 
-  private async save(token: StoredToken): Promise<void> {
-    const dir = path.dirname(this.filePath);
+  private async updateConfig(updates: Partial<CopilotConfig>): Promise<void> {
+    const current = await this.getConfig();
+    const merged: CopilotConfig = {
+      refreshToken: updates.refreshToken ?? current?.refreshToken ?? '',
+      accessToken: updates.accessToken,
+      accessTokenExpiresAt: updates.accessTokenExpiresAt,
+      baseUrl: updates.baseUrl ?? current?.baseUrl ?? 'https://api.githubcopilot.com',
+      enterpriseUrl: updates.enterpriseUrl ?? current?.enterpriseUrl,
+    };
 
-    // 确保目录存在
-    await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(this.filePath, JSON.stringify(token, null, 2));
+    await setDBConfig({ copilot: merged });
+    this.configCache = merged;
   }
 }

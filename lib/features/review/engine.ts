@@ -51,7 +51,7 @@ export class ReviewEngine {
     const mrChanges = await this.gitlabClient.getMergeRequestChanges(projectId, mrIid);
     const commitSha = mrChanges.diffRefs.headSha;
 
-    const db = getDb();
+    const db = await getDb();
 
     // 获取或创建 review 记录
     let reviewId: number;

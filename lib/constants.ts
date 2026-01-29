@@ -1,15 +1,5 @@
-// ============================================================================
-// Application Constants
-// ============================================================================
-
-/**
- * Default AI model to use for code review
- */
 export const DEFAULT_AI_MODEL = 'anthropic:claude-sonnet-4-5' as const;
 
-/**
- * Default configuration values
- */
 export const DEFAULT_CONFIG = {
   PORT: 3000,
   HOST: '0.0.0.0',
@@ -19,9 +9,6 @@ export const DEFAULT_CONFIG = {
   LOG_LEVEL: 'info' as const,
 } as const;
 
-/**
- * Webhook event types
- */
 export const WEBHOOK_EVENT_TYPES = {
   MERGE_REQUEST: 'merge_request',
   PUSH: 'push',
@@ -31,9 +18,6 @@ export const WEBHOOK_EVENT_TYPES = {
 
 export type WebhookEventType = typeof WEBHOOK_EVENT_TYPES[keyof typeof WEBHOOK_EVENT_TYPES];
 
-/**
- * Review status types
- */
 export const REVIEW_STATUS = {
   PENDING: 'pending',
   RUNNING: 'running',
@@ -43,9 +27,6 @@ export const REVIEW_STATUS = {
 
 export type ReviewStatus = typeof REVIEW_STATUS[keyof typeof REVIEW_STATUS];
 
-/**
- * Trigger types
- */
 export const TRIGGER_TYPES = {
   WEBHOOK: 'webhook',
   MANUAL: 'manual',
@@ -54,17 +35,11 @@ export const TRIGGER_TYPES = {
 
 export type TriggerType = typeof TRIGGER_TYPES[keyof typeof TRIGGER_TYPES];
 
-/**
- * Review commands
- */
 export const REVIEW_COMMANDS = {
   REVIEW: '/review',
   AI_REVIEW: '/ai-review',
 } as const;
 
-/**
- * Default file patterns to skip during review
- */
 export const DEFAULT_SKIP_PATTERNS = [
   '*.lock',
   'package-lock.json',
@@ -75,17 +50,11 @@ export const DEFAULT_SKIP_PATTERNS = [
   '*.min.css',
 ] as const;
 
-/**
- * Default webhook events for merge requests
- */
 export const DEFAULT_WEBHOOK_MR_EVENTS = [
   'open',
   'update',
 ] as const;
 
-/**
- * Severity levels for code review
- */
 export const SEVERITY_LEVELS = {
   CRITICAL: 'critical',
   MAJOR: 'major',
@@ -95,9 +64,6 @@ export const SEVERITY_LEVELS = {
 
 export type SeverityLevel = typeof SEVERITY_LEVELS[keyof typeof SEVERITY_LEVELS];
 
-/**
- * Failure behavior options
- */
 export const FAILURE_BEHAVIOR = {
   BLOCKING: 'blocking',
   NON_BLOCKING: 'non-blocking',
@@ -105,33 +71,21 @@ export const FAILURE_BEHAVIOR = {
 
 export type FailureBehavior = typeof FAILURE_BEHAVIOR[keyof typeof FAILURE_BEHAVIOR];
 
-/**
- * Default file review limits
- */
 export const FILE_LIMITS = {
   MAX_FILES: DEFAULT_CONFIG.REVIEW_MAX_FILES,
   MAX_LINES_PER_FILE: DEFAULT_CONFIG.REVIEW_MAX_LINES_PER_FILE,
 } as const;
 
-/**
- * Cache configuration
- */
 export const CACHE_CONFIG = {
   CONFIG_REVALIDATE: 60, // seconds
   CACHE_TAG: 'config' as const,
 } as const;
 
-/**
- * API endpoints
- */
 export const API_ENDPOINTS = {
   WEBHOOK: '/api/webhook',
   HEALTH: '/api/health',
 } as const;
 
-/**
- * Routes
- */
 export const ROUTES = {
   HOME: '/',
   REVIEWS: '/reviews',
@@ -139,9 +93,6 @@ export const ROUTES = {
   WEBHOOKS: '/webhooks',
 } as const;
 
-/**
- * Time constants
- */
 export const TIME_CONSTANTS = {
   SECOND: 1000,
   MINUTE: 60 * 1000,

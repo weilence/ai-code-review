@@ -28,6 +28,7 @@ export interface EnqueueOptions {
   triggeredBy: TriggeredBy;
   triggerEvent?: string;
   webhookEventId?: number;
+  reviewId?: number; // 用于重试时关联现有 review 记录
 }
 
 // ============================================================================

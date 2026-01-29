@@ -38,7 +38,7 @@ export async function getWebhooks(options?: {
   offset?: number;
 }) {
   try {
-    const db = getDb();
+    const db = await getDb();
     const { objectKind, limit = 50, offset = 0 } = options || {};
 
     // 构建查询条件
@@ -120,7 +120,7 @@ export async function getRecentWebhooks(limit = 50) {
  */
 export async function getWebhookById(id: number) {
   try {
-    const db = getDb();
+    const db = await getDb();
     const logs = await db
       .select()
       .from(webhooks)
@@ -139,7 +139,7 @@ export async function getWebhookById(id: number) {
  */
 export async function deleteWebhook(id: number) {
   try {
-    const db = getDb();
+    const db = await getDb();
 
     await db.delete(webhooks).where(eq(webhooks.id, id));
 
@@ -163,7 +163,7 @@ export async function deleteWebhook(id: number) {
  */
 export async function clearAllWebhooks() {
   try {
-    const db = getDb();
+    const db = await getDb();
 
     await db.delete(webhooks);
 

@@ -53,36 +53,10 @@ export function getDatabasePath(): string {
 
   // 使用用户数据目录
   const dataDir = getUserDataDir();
-  logger.debug(`Using database path in user data directory: ${dataDir}`);
-
-  return path.join(dataDir, 'ai-code-review.db');
-}
-
-/**
- * 确保数据目录存在
- * 如果不存在则递归创建
- */
-export function ensureDataDir(): string {
-  const dataDir = getUserDataDir();
-
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
+  logger.debug(`Using database path in user data directory: ${dataDir}`);
 
-  return dataDir;
-}
-
-/**
- * 获取 GitHub Copilot token 文件路径
- * 优先使用环境变量 COPILOT_TOKEN_PATH，否则使用用户数据目录
- */
-export function getCopilotTokenPath(): string {
-  // 如果设置了环境变量，直接使用
-  if (process.env.COPILOT_TOKEN_PATH) {
-    return process.env.COPILOT_TOKEN_PATH;
-  }
-
-  // 使用用户数据目录
-  const dataDir = getUserDataDir();
-  return path.join(dataDir, 'copilot-token.json');
+  return path.join(dataDir, 'ai-code-review.db');
 }

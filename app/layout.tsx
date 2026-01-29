@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { initQueueManager } from "@/lib/queue-init";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -23,11 +22,6 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Initialize queue manager on app startup
-  await initQueueManager().catch((error) => {
-    console.error('Failed to initialize queue manager:', error);
-  });
-
   return (
     <html lang="en">
       <body
