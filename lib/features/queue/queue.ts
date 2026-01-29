@@ -72,62 +72,41 @@ export class TaskQueue {
     }
   }
 
-  async dequeue(workerId: string): Promise<QueueTask | null> {
+  async dequeue(_workerId: string): Promise<QueueTask | null> {
     const db = await getDb();
     const now = Date.now();
 
     try {
-      return await db.transaction(async (tx) => {
-        const subquery = tx
-          .select({ id: reviewQueue.id })
-          .from(reviewQueue)
-          .where(eq(reviewQueue.status, 'pending'))
-          .orderBy(reviewQueue.priority, reviewQueue.createdAt)
-          .limit(1)
-          .as('subquery');
+      const task = await db
+        .select()
+        .from(reviewQueue)
+        .where(eq(reviewQueue.status, 'pending'))
+        .orderBy(reviewQueue.priority, reviewQueue.createdAt)
+        .limit(1);
 
-        const result = await tx.update(reviewQueue)
-          .set({
-            status: 'running',
-            lockedAt: new Date(now),
-            lockedBy: workerId,
-            updatedAt: new Date(now),
-          })
-          .where(sql`${reviewQueue.id} in (SELECT id FROM ${subquery})`);
+      if (!task || task.length === 0) {
+        return null;
+      }
 
-        if (result.rowsAffected === 0) {
-          logger.debug({ workerId }, 'No pending tasks available');
-          return null;
-        }
+      const [updatedTask] = await db
+        .update(reviewQueue)
+        .set({
+          status: 'running',
+          lockedAt: new Date(now),
+          lockedBy: _workerId,
+          updatedAt: new Date(now),
+        })
+        .where(eq(reviewQueue.id, task[0].id))
+        .returning();
 
-        const tasks = await tx
-          .select()
-          .from(reviewQueue)
-          .where(
-            and(
-              eq(reviewQueue.status, 'running'),
-              eq(reviewQueue.lockedBy, workerId)
-            )
-          )
-          .orderBy(sql`${reviewQueue.lockedAt} DESC`)
-          .limit(1);
+      logger.debug(
+        { taskId: updatedTask.id, projectId: updatedTask.projectId, mrIid: updatedTask.mrIid },
+        'Task dequeued successfully'
+      );
 
-        if (!tasks || tasks.length === 0) {
-          logger.warn({ workerId }, 'Task locked but not found in follow-up query');
-          return null;
-        }
-
-        const task = tasks[0];
-
-        logger.debug(
-          { taskId: task.id, projectId: task.projectId, mrIid: task.mrIid, workerId },
-          'Task dequeued successfully'
-        );
-
-        return task;
-      }, { behavior: 'immediate' });
+      return updatedTask;
     } catch (error) {
-      logger.error({ error, workerId }, 'Failed to dequeue task');
+      logger.error({ error }, 'Failed to dequeue task');
       throw error;
     }
   }

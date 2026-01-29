@@ -51,7 +51,10 @@ export class RetryHandler {
   classifyError(error: Error): ErrorType {
     const message = error.message.toLowerCase();
 
-    // Transient errors (network, temporary)
+    if (/sqlite_busy|database is locked|database locked/i.test(message)) {
+      return 'transient';
+    }
+
     if (/econnrefused|etimedout|etimedout|timeout|network/i.test(message)) {
       return 'transient';
     }

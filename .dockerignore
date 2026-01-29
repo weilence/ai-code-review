@@ -53,3 +53,4 @@ docker-compose.*.yml
 # 其他
 .DS_Store
 *.log
+.data

@@ -85,11 +85,11 @@ PRAGMA synchronous = NORMAL;    // 同步模式
 
 ## 队列系统（lib/features/queue/）
 
-QueueManager 是后台任务队列系统，用于异步处理代码审查任务。协调以下组件：
+QueueManager 是后台任务队列系统，用于异步处理代码审查任务。采用单线程串行调度模式，确保任务顺序执行。
 
-- **TaskQueue** - 任务队列存储
-- **TaskScheduler** - 任务调度器（定时轮询）
-- **WorkerPool** - 工作池（并发执行控制）
+**核心组件：**
+- **TaskQueue** - 任务队列存储（数据库）
+- **SimpleTaskScheduler** - 任务调度器（单线程串行轮询）
 - **TaskExecutor** - 任务执行器（调用 ReviewEngine）
 - **RetryHandler** - 重试处理器（指数退避）
 
@@ -98,7 +98,6 @@ QueueManager 是后台任务队列系统，用于异步处理代码审查任务�
 |--------|------|--------|
 | `enabled` | 是否启用队列系统 | `true` |
 | `pollingIntervalMs` | 轮询间隔（毫秒） | `5000` |
-| `maxConcurrentTasks` | 最大并发任务数 | `3` |
 | `taskTimeoutMs` | 任务超时时间（毫秒） | `300000` |
 | `maxRetries` | 最大重试次数 | `3` |
 | `retryBackoffMs` | 重试退避基础时间（毫秒） | `60000` |
@@ -108,10 +107,14 @@ QueueManager 是后台任务队列系统，用于异步处理代码审查任务�
 | `retainCompletedDays` | 保留已完成任务天数 | `7` |
 
 **队列组件说明**：
-- `queue.ts` - 队列数据结构和操作
-- `scheduler.ts` - 定时调度器，驱动任务执行
-- `worker.ts` - 工作池，管理并发执行
+- `queue.ts` - 队列数据结构和操作（enqueue、dequeue、markCompleted、markFailed）
+- `scheduler.ts` - 单线程串行调度器，逐个处理任务
 - `executor.ts` - 执行器，实际调用审查逻辑
 - `retry-handler.ts` - 重试逻辑，支持指数退避
 - `schema.ts` - 队列相关类型定义
 - `singleton.ts` - 单例访问入口
+
+**设计原则：**
+- 简化并发控制，使用单线程串行调度
+- 任务按优先级（priority）和创建时间（createdAt）排序
+- 数据库事务保证并发安全

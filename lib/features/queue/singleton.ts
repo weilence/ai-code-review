@@ -1,10 +1,8 @@
 import type { ReviewEngine } from '@/lib/features/review/engine';
-import type { QueueConfig, EnqueueOptions, QueueStats, WorkerStats } from './schema';
+import type { QueueConfig, EnqueueOptions, QueueStats } from './schema';
 import { TaskQueue } from './queue';
-import { TaskScheduler } from './scheduler';
+import { SimpleTaskScheduler } from './scheduler';
 import { TaskExecutor } from './executor';
-import { WorkerPool } from './worker';
-import { RetryHandler } from './retry-handler';
 import { createLogger } from '@/lib/utils/logger';
 
 const logger = createLogger('queue-manager');
@@ -13,24 +11,20 @@ export class QueueManager {
   private isRunning: boolean = false;
 
   private queue: TaskQueue;
-  private retryHandler: RetryHandler;
   private executor: TaskExecutor;
-  private workerPool: WorkerPool;
-  private scheduler: TaskScheduler;
+  private scheduler: SimpleTaskScheduler;
 
   constructor(
     reviewEngine: ReviewEngine,
     private config: QueueConfig
   ) {
     this.queue = new TaskQueue();
-    this.retryHandler = new RetryHandler(config);
-    this.executor = new TaskExecutor(reviewEngine, this.retryHandler);
-    this.workerPool = new WorkerPool(
-      this.executor,
+    this.executor = new TaskExecutor(reviewEngine);
+    this.scheduler = new SimpleTaskScheduler(
       this.queue,
-      config.maxConcurrentTasks
+      this.executor,
+      config
     );
-    this.scheduler = new TaskScheduler(this.queue, this.workerPool, config);
   }
 
   async start(): Promise<void> {
@@ -77,11 +71,7 @@ export class QueueManager {
   }
 
   async getStats(): Promise<QueueStats> {
-    return await this.scheduler.getStats();
-  }
-
-  getWorkerStats(): WorkerStats {
-    return this.workerPool.getStats();
+    return await this.queue.getStats();
   }
 
   isActive(): boolean {

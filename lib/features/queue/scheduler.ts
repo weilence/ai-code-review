@@ -1,31 +1,29 @@
 /**
- * TaskScheduler - Polling scheduler for queue tasks
+ * SimpleTaskScheduler - Single-threaded serial task scheduler
+ * Processes tasks one by one, ensuring no concurrent execution
  */
 
-import type { QueueConfig, QueueStats } from './schema';
+import type { QueueConfig } from './schema';
 import { TaskQueue } from './queue';
-import { WorkerPool } from './worker';
+import type { TaskExecutor } from './executor';
 import { createLogger } from '@/lib/utils/logger';
 
 const logger = createLogger('task-scheduler');
 
-export class TaskScheduler {
+export class SimpleTaskScheduler {
   private isRunning: boolean = false;
+  private isProcessing: boolean = false;
   private pollTimer: NodeJS.Timeout | null = null;
   private cleanupTimer: NodeJS.Timeout | null = null;
-  private workerId: string;
 
   constructor(
     private queue: TaskQueue,
-    private workerPool: WorkerPool,
+    private executor: TaskExecutor,
     private config: QueueConfig
-  ) {
-    // Generate unique worker ID
-    this.workerId = `worker-${crypto.randomUUID()}`;
-  }
+  ) {}
 
   /**
-   * Start the scheduler (begins polling)
+   * Start scheduler (begins polling)
    */
   async start(): Promise<void> {
     if (this.isRunning) {
@@ -35,14 +33,12 @@ export class TaskScheduler {
 
     this.isRunning = true;
 
-    // Start polling loop
     this.pollTimer = setInterval(() => {
       this.poll().catch((error) => {
         logger.error({ error }, 'Error in poll loop');
       });
     }, this.config.pollingIntervalMs);
 
-    // Start cleanup loop
     this.cleanupTimer = setInterval(() => {
       this.cleanup().catch((error) => {
         logger.error({ error }, 'Error in cleanup loop');
@@ -51,18 +47,16 @@ export class TaskScheduler {
 
     logger.info(
       {
-        workerId: this.workerId,
         pollingIntervalMs: this.config.pollingIntervalMs,
       },
       'Scheduler started'
     );
 
-    // Execute first poll immediately
     await this.poll();
   }
 
   /**
-   * Stop the scheduler (graceful shutdown)
+   * Stop scheduler (graceful shutdown)
    */
   async stop(): Promise<void> {
     if (!this.isRunning) {
@@ -74,7 +68,6 @@ export class TaskScheduler {
 
     this.isRunning = false;
 
-    // Clear timers
     if (this.pollTimer) {
       clearInterval(this.pollTimer);
       this.pollTimer = null;
@@ -85,86 +78,55 @@ export class TaskScheduler {
       this.cleanupTimer = null;
     }
 
-    // Wait for all active tasks to complete
-    await this.workerPool.drain();
-
     logger.info('Scheduler stopped');
   }
 
   /**
-   * Single polling iteration
+   * Single polling iteration - process one task at a time
    */
   private async poll(): Promise<void> {
-    if (!this.isRunning) {
+    if (!this.isRunning || this.isProcessing) {
       return;
     }
 
     try {
-      // Calculate available worker slots
-      const availableSlots = this.config.maxConcurrentTasks - this.workerPool.runningCount;
+      const task = await this.queue.dequeue('simple-scheduler');
 
-      if (availableSlots <= 0) {
-        logger.debug(
-          { runningTasks: this.workerPool.runningCount, maxTasks: this.config.maxConcurrentTasks },
-          'Max concurrent tasks reached, skipping poll'
-        );
+      if (!task) {
         return;
       }
 
-      // Dequeue and execute tasks
-      let tasksDequeued = 0;
+      this.isProcessing = true;
 
-      for (let i = 0; i < availableSlots; i++) {
-        const task = await this.queue.dequeue(this.workerId);
+      logger.info(
+        {
+          taskId: task.id,
+          projectId: task.projectId,
+          mrIid: task.mrIid,
+        },
+        'Processing task'
+      );
 
-        if (!task) {
-          break; // No more tasks available
+      try {
+        const result = await this.executor.execute(task);
+
+        if (result.success) {
+          await this.queue.markCompleted(task.id, result.reviewId!, result.durationMs);
+          logger.info({ taskId: task.id, reviewId: result.reviewId }, 'Task completed');
+        } else {
+          await this.queue.markFailed(task.id, result.error!);
+          logger.error({ taskId: task.id, error: result.error?.message }, 'Task failed');
         }
-
-        // Submit to worker pool (don't await)
-        this.workerPool.execute(task).catch((error) => {
-          logger.error({ taskId: task.id, error }, 'Worker pool execution failed');
-        });
-
-        tasksDequeued++;
+      } catch (error) {
+        logger.error({ taskId: task.id, error }, 'Task execution error');
+        const errorObj = error instanceof Error ? error : new Error(String(error));
+        await this.queue.markFailed(task.id, errorObj);
+      } finally {
+        this.isProcessing = false;
       }
-
-      if (tasksDequeued > 0) {
-        logger.info({ tasksDequeued, workerId: this.workerId }, 'Tasks dequeued and submitted');
-      }
-
-      // Recover stuck tasks
-      await this.recoverStuckTasks();
     } catch (error) {
       logger.error({ error }, 'Error in poll loop');
-    }
-  }
-
-  /**
-   * Recover stuck tasks (locked but timeout exceeded)
-   */
-  private async recoverStuckTasks(): Promise<void> {
-    try {
-      const stuckTasks = await this.queue.getStuckTasks(this.config.taskTimeoutMs);
-
-      if (stuckTasks.length > 0) {
-        logger.warn(
-          { stuckTaskCount: stuckTasks.length, timeoutMs: this.config.taskTimeoutMs },
-          'Found stuck tasks, recovering...'
-        );
-
-        for (const task of stuckTasks) {
-          logger.warn(
-            { taskId: task.id, lockedBy: task.lockedBy, lockedAt: task.lockedAt },
-            'Recovering stuck task'
-          );
-
-          // Release lock and requeue
-          await this.queue.releaseLock(task.id, task.lockedBy!);
-        }
-      }
-    } catch (error) {
-      logger.error({ error }, 'Error recovering stuck tasks');
+      this.isProcessing = false;
     }
   }
 
@@ -184,16 +146,5 @@ export class TaskScheduler {
     } catch (error) {
       logger.error({ error }, 'Error in cleanup loop');
     }
-  }
-
-  /**
-   * Get queue statistics
-   */
-  async getStats(): Promise<QueueStats> {
-    const stats = await this.queue.getStats();
-    return {
-      ...stats,
-      cancelled: 0, // Cancelled tasks are counted separately
-    };
   }
 }
