@@ -78,11 +78,12 @@ types/                    # 类型定义
 
 ## Custom Server
 
-项目使用 Custom Server (`server.ts`)，所有单例在启动时统一初始化并存储在 `globalThis`。
+项目使用 instrumentation.ts 初始化所有单例并存储在 `globalThis`。
 
 初始化顺序：
-1. GitLabClient（无依赖）
-2. ReviewEngine（依赖 GitLabClient）
-3. QueueManager（依赖 ReviewEngine）
+1. Database（无依赖）
+2. GitLabClient（无依赖）
+3. ReviewEngine（依赖 GitLabClient、Database）
+4. QueueManager（依赖 ReviewEngine）
 
 优雅关闭：SIGTERM/SIGINT 时停止 QueueManager。

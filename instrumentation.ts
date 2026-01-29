@@ -1,4 +1,6 @@
 
+import { drizzle } from 'drizzle-orm/libsql'
+import { createClient } from '@libsql/client'
 import { getDBConfig } from '@/lib/features/config'
 import { GitLabClient } from '@/lib/features/gitlab/client'
 import { AICodeReviewRegistry } from '@/lib/features/ai'
@@ -7,6 +9,10 @@ import { ReviewEngine } from '@/lib/features/review/engine'
 import { QueueManager } from '@/lib/features/queue'
 import { DEFAULT_AI_MODEL } from '@/lib/constants'
 import { createLogger } from '@/lib/utils/logger'
+import { getDatabasePath } from '@/lib/db/path'
+import * as schema from '@/lib/db/schema'
+
+export const runtime = 'nodejs'
 
 const logger = createLogger('instrumentation')
 
@@ -17,6 +23,23 @@ export async function register() {
 }
 
 async function initializeSingletons(): Promise<void> {
+  if (!globalThis.__DB__) {
+    const databasePath = getDatabasePath() + '/ai-code-review.db'
+
+    const url = databasePath.startsWith('file:')
+      ? databasePath
+      : `file:${databasePath}`
+
+    const libsqlClient = createClient({ url })
+
+    await libsqlClient.execute('PRAGMA journal_mode = WAL;')
+    await libsqlClient.execute('PRAGMA foreign_keys = ON;')
+    await libsqlClient.execute('PRAGMA synchronous = NORMAL;')
+
+    globalThis.__DB__ = drizzle(libsqlClient, { schema })
+    logger.info('Database initialized')
+  }
+
   const config = await getDBConfig()
 
   if (!globalThis.__GITLAB_CLIENT__) {

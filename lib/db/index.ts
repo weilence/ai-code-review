@@ -1,37 +1,20 @@
 import { drizzle } from 'drizzle-orm/libsql';
-import { createClient } from '@libsql/client';
 import * as schema from './schema';
-import { getDatabasePath } from './path';
 
-let db: ReturnType<typeof drizzle<typeof schema>> | null = null;
-let libsqlClient: ReturnType<typeof createClient> | null = null;
+export type Db = ReturnType<typeof drizzle<typeof schema>>;
 
-export async function getDb() {
-  if (!db) {
-    const databasePath = getDatabasePath();
-
-    const url = databasePath.startsWith('file:')
-      ? databasePath
-      : `file:${databasePath}`;
-
-    libsqlClient = createClient({ url });
-
-    await libsqlClient.execute('PRAGMA journal_mode = WAL;');
-    await libsqlClient.execute('PRAGMA foreign_keys = ON;');
-    await libsqlClient.execute('PRAGMA synchronous = NORMAL;');
-
-    db = drizzle(libsqlClient, { schema });
+export async function getDb(): Promise<Db> {
+  if (!globalThis.__DB__) {
+    throw new Error(
+      'Database has not been initialized. Make sure the server is running.',
+    );
   }
 
-  return db;
+  return globalThis.__DB__;
 }
 
-export function resetDb() {
-  if (libsqlClient) {
-    libsqlClient.close();
-    libsqlClient = null;
-    db = null;
-  }
+export function resetDb(): void {
+  globalThis.__DB__ = undefined;
 }
 
 export * from './schema';

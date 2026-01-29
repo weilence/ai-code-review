@@ -132,3 +132,46 @@ import { ClientDateTime } from '@/components/ui/client-date-time';
 - **文件限制：** `maxFiles`（默认 50）、`maxLinesPerFile`（默认 1000）
 - **失败阈值：** `failureThreshold` 设置最低严重级别（critical > major > minor > suggestion）
 - **失败行为：** `blocking`（阻止合并）或 `non-blocking`
+
+## 代码风格
+
+### 注释
+- 保持最少，除非必要不添加 JSDoc 或行内注释
+- 代码本身应该足够清晰，无需过度注释
+
+### 导入顺序
+```typescript
+// 导入顺序：
+// 1. React/Next.js
+// 2. 第三方库
+// 3. 内部类型
+// 4. 内部功能模块
+// 5. 工具函数
+import { useState } from 'react';
+import { ai } from '@ai-sdk/openai';
+import type { PageProps } from '@/types/next';
+import { getReviewEngine } from '@/lib/features/review';
+import { formatDate } from '@/lib/utils/format';
+```
+
+**推荐导入路径：**
+- `@/types/*` - 类型定义
+- `@/lib/features/*` - 功能域模块
+- `@/lib/db` - 数据库
+- `@/actions/*` - Server Actions
+- `@/components/*` - UI 组件
+
+### 日志
+使用 Pino 创建具名日志器：
+```typescript
+import { createLogger } from '@/lib/utils/logger';
+
+const logger = createLogger('module-name');
+logger.info({ reviewId }, 'Review started');
+logger.error({ error }, 'Review failed');
+```
+
+### 参考资料
+- [Vercel AI SDK](https://sdk.vercel.ai/docs)
+- [Drizzle ORM](https://orm.drizzle.team)
+- [Next.js App Router](https://nextjs.org/docs/app)
