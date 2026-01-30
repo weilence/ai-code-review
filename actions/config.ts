@@ -75,7 +75,7 @@ export async function exportSettings() {
     return {
       success: true,
       data: {
-        dbConfig: config,
+        dbSettings: config,
         version: '2.0',
         exportedAt: new Date().toISOString(),
       },

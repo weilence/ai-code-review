@@ -56,16 +56,7 @@ async function seedConfigData() {
       level: 'info',
     },
     queue: {
-      enabled: true,
       pollingIntervalMs: 5000,
-      maxConcurrentTasks: 3,
-      taskTimeoutMs: 300000,
-      maxRetries: 3,
-      retryBackoffMs: 60000,
-      retryBackoffMultiplier: 2.0,
-      maxRetryBackoffMs: 600000,
-      cleanupIntervalMs: 3600000,
-      retainCompletedDays: 7,
     },
   });
 

@@ -80,16 +80,7 @@ export function SettingsForm({ config }: SettingsFormProps) {
           failureThreshold: reviewConfig.failureThreshold ?? 'critical',
         },
         queue: {
-          enabled: queueConfig.enabled ?? true,
           pollingIntervalMs: queueConfig.pollingIntervalMs ?? 5000,
-          maxConcurrentTasks: queueConfig.maxConcurrentTasks ?? 3,
-          taskTimeoutMs: queueConfig.taskTimeoutMs ?? 300000,
-          maxRetries: queueConfig.maxRetries ?? 3,
-          retryBackoffMs: queueConfig.retryBackoffMs ?? 60000,
-          retryBackoffMultiplier: queueConfig.retryBackoffMultiplier ?? 2.0,
-          maxRetryBackoffMs: queueConfig.maxRetryBackoffMs ?? 600000,
-          cleanupIntervalMs: queueConfig.cleanupIntervalMs ?? 3600000,
-          retainCompletedDays: queueConfig.retainCompletedDays ?? 7,
         },
       };
 

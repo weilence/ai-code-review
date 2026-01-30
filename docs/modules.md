@@ -23,7 +23,7 @@ ReviewEngine 类是核心组件，负责：
 4. 调用 AI 分析（分文件或分批）
 5. 生成内联评论 + 摘要
 6. 发布到 GitLab（评论 + Commit Status）
-7. 保存结果到 reviewResults
+7. 保存结果到 reviewLogs
 8. 更新 reviews 状态（completed/failed）
 
 ## AI 提供商注册表（lib/features/ai/）
@@ -62,8 +62,7 @@ AICodeReviewRegistry 使用 Vercel AI SDK 的 `createProviderRegistry()` 统一�
 使用 **Drizzle ORM** + **@libsql/client**：
 
 - `reviews` - 审查记录主表（包含状态、耗时、重试次数）
-- `reviewResults` - 审查结果（JSON 存储内联评论和摘要）
-- `reviewErrors` - 审查错误日志（支持重试标识）
+- `reviewLogs` - 审查日志（JSON 存储内联评论、摘要、错误信息）
 - `webhooks` - Webhook 事件日志（使用 `objectKind` 字段存储 GitLab 原始事件类型）
 - `settings` - 配置数据（Key-Value 格式）
 
@@ -83,38 +82,35 @@ PRAGMA synchronous = NORMAL;    // 同步模式
 - Windows: `%APPDATA%\ai-code-review\ai-code-review.db`
 - 可通过环境变量 `DATABASE_PATH` 自定义
 
-## 队列系统（lib/features/queue/）
+## 队列系统（lib/features/review/scheduler.ts）
 
-QueueManager 是后台任务队列系统，用于异步处理代码审查任务。采用单线程串行调度模式，确保任务顺序执行。
+ReviewScheduler 是后台任务队列系统，用于异步处理代码审查任务。采用单线程串行调度模式，确保任务顺序执行。
 
 **核心组件：**
-- **TaskQueue** - 任务队列存储（数据库）
-- **SimpleTaskScheduler** - 任务调度器（单线程串行轮询）
-- **TaskExecutor** - 任务执行器（调用 ReviewEngine）
-- **RetryHandler** - 重试处理器（指数退避）
+- **ReviewScheduler** - 任务调度器（单线程串行轮询、执行、重试）
+- **reviews 表** - 任务队列存储（`status` 字段为 'pending' 的记录）
 
 **队列配置**（在数据库 `settings` 表中）：
 | 配置项 | 说明 | 默认值 |
 |--------|------|--------|
-| `enabled` | 是否启用队列系统 | `true` |
 | `pollingIntervalMs` | 轮询间隔（毫秒） | `5000` |
-| `taskTimeoutMs` | 任务超时时间（毫秒） | `300000` |
-| `maxRetries` | 最大重试次数 | `3` |
-| `retryBackoffMs` | 重试退避基础时间（毫秒） | `60000` |
-| `retryBackoffMultiplier` | 退避时间倍数 | `2.0` |
-| `maxRetryBackoffMs` | 最大退避时间（毫秒） | `600000` |
-| `cleanupIntervalMs` | 清理间隔（毫秒） | `3600000` |
-| `retainCompletedDays` | 保留已完成任务天数 | `7` |
 
-**队列组件说明**：
-- `queue.ts` - 队列数据结构和操作（enqueue、dequeue、markCompleted、markFailed）
-- `scheduler.ts` - 单线程串行调度器，逐个处理任务
-- `executor.ts` - 执行器，实际调用审查逻辑
-- `retry-handler.ts` - 重试逻辑，支持指数退避
-- `schema.ts` - 队列相关类型定义
-- `singleton.ts` - 单例访问入口
+**配置说明：**
+- `pollingIntervalMs`: 轮询间隔（毫秒），队列扫描待处理任务的频率。值越小响应越快但数据库负载越高。默认 5000（5秒）。
+
+**队列组件说明：**
+- `scheduler.ts` - ReviewScheduler 类（单线程串行调度器）
+- `singleton.ts` - 单例访问入口（initScheduler、startScheduler、stopScheduler）
 
 **设计原则：**
 - 简化并发控制，使用单线程串行调度
-- 任务按优先级（priority）和创建时间（createdAt）排序
+- 任务按创建时间（createdAt）排序
 - 数据库事务保证并发安全
+- 失败任务不会自动重试，需要用户手动触发重试
+
+**工作流程：**
+1. ReviewScheduler 定期轮询数据库，查找 `status='pending'` 的审查任务
+2. 找到待处理任务后，将状态更新为 'running'
+3. 调用 ReviewEngine 执行代码审查
+4. 审查成功或失败后，更新 reviews 表的状态
+5. 失败的任务状态为 'failed'，需要用户手动点击重试按钮

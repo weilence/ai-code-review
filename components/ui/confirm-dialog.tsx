@@ -108,14 +108,16 @@ export function ConfirmDialog({
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="pl-13">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleCancel}
-            disabled={isLoading}
-          >
-            {finalOptions.cancelText}
-          </Button>
+          {finalOptions.cancelText && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCancel}
+              disabled={isLoading}
+            >
+              {finalOptions.cancelText}
+            </Button>
+          )}
           <Button
             type="button"
             variant={finalOptions.variant === 'destructive' ? 'default' : 'default'}

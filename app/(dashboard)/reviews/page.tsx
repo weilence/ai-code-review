@@ -19,10 +19,10 @@ export default async function ReviewsPage({
   );
 
   // 只接受有效的状态值
-  const validStatuses = ['pending', 'running', 'completed', 'failed'] as const;
+  const validStatuses = ['pending', 'running', 'completed', 'failed', 'cancelled'] as const;
   type ValidStatus = typeof validStatuses[number];
   const status = statusParam && validStatuses.includes(statusParam as ValidStatus)
-    ? (statusParam as 'pending' | 'running' | 'completed' | 'failed')
+    ? (statusParam as 'pending' | 'running' | 'completed' | 'failed' | 'cancelled')
     : undefined;
 
   const result = await getReviews({ status, limit: 50 });
@@ -35,6 +35,7 @@ export default async function ReviewsPage({
     running: { label: '进行中', icon: AlertCircle, color: 'text-yellow-500' },
     completed: { label: '已完成', icon: CheckCircle2, color: 'text-green-500' },
     failed: { label: '失败', icon: XCircle, color: 'text-red-500' },
+    cancelled: { label: '已取消', icon: XCircle, color: 'text-gray-400' },
   };
 
   return (

@@ -6,7 +6,7 @@ import { GitLabClient } from '@/lib/features/gitlab/client'
 import { AICodeReviewRegistry } from '@/lib/features/ai'
 import { CopilotTokenStorage } from '@/lib/features/ai/github-copilot'
 import { ReviewEngine } from '@/lib/features/review/engine'
-import { QueueManager } from '@/lib/features/queue'
+import { initScheduler, startScheduler, stopScheduler } from '@/lib/features/review/singleton'
 import { DEFAULT_AI_MODEL } from '@/lib/constants'
 import { createLogger } from '@/lib/utils/logger'
 import { getDatabasePath } from '@/lib/db/path'
@@ -16,7 +16,7 @@ const logger = createLogger('instrumentation')
 
 export async function initializeSingletons(): Promise<void> {
   if (!globalThis.__DB__) {
-    const databasePath = getDatabasePath() + '/ai-code-review.db'
+    const databasePath = getDatabasePath()
 
     const url = databasePath.startsWith('file:')
       ? databasePath
@@ -55,16 +55,16 @@ export async function initializeSingletons(): Promise<void> {
     logger.info('ReviewEngine initialized')
   }
 
-  if (!globalThis.__QUEUE_MANAGER__) {
-    globalThis.__QUEUE_MANAGER__ = new QueueManager(
+  if (!globalThis.__REVIEW_SCHEDULER__) {
+    initScheduler(
       globalThis.__REVIEW_ENGINE__,
-      config.queue,
+      config.queue?.pollingIntervalMs || 5000,
     )
-    logger.info('QueueManager initialized')
+    logger.info('ReviewScheduler initialized')
   }
 
-  await globalThis.__QUEUE_MANAGER__.start()
-  logger.info('QueueManager started')
+  await startScheduler()
+  logger.info('ReviewScheduler started')
 
   // 优雅关闭
   process.on('SIGTERM', shutdown)
@@ -74,10 +74,8 @@ export async function initializeSingletons(): Promise<void> {
 async function shutdown(): Promise<void> {
   logger.info('Shutting down...')
 
-  if (globalThis.__QUEUE_MANAGER__) {
-    await globalThis.__QUEUE_MANAGER__.stop()
-    logger.info('QueueManager stopped')
-  }
+  await stopScheduler()
+  logger.info('ReviewScheduler stopped')
 
   process.exit(0)
 }

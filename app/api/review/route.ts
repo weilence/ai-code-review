@@ -3,6 +3,7 @@ import { getDBConfig } from '@/lib/features/config';
 import { getReviewEngine } from '@/lib/features/review/singleton';
 import { parseGitLabMRUrl } from '@/lib/utils/gitlab';
 import { GitLabClient } from '@/lib/features/gitlab/client';
+import { getDb } from '@/lib/db';
 
 export async function POST(request: Request) {
   try {
@@ -51,10 +52,40 @@ export async function POST(request: Request) {
 
     const projectId = projectInfo.id;
 
+    // 获取 MR 信息以创建 review 记录
+    const mrInfo = await gitlabClient.getMergeRequestChanges(projectId, mrIid);
+
+    // 创建 review 记录
+    const db = await getDb();
+    const { reviews } = await import('@/lib/db');
+    const [review] = await db.insert(reviews).values({
+      projectId: String(projectId),
+      projectPath,
+      mrIid,
+      mrTitle: mrInfo.title,
+      mrAuthor: mrInfo.author.username,
+      mrDescription: mrInfo.description || null,
+      sourceBranch: mrInfo.sourceBranch,
+      targetBranch: mrInfo.targetBranch,
+      status: 'pending',
+      triggeredBy: 'manual',
+      triggerEvent: 'api',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
+
+    if (!review) {
+      return NextResponse.json(
+        { success: false, message: 'Failed to create review record' },
+        { status: 500 }
+      );
+    }
+
     // 异步触发审查（不等待完成）
     reviewEngine.reviewMergeRequest({
       projectId,
       mrIid,
+      reviewId: review.id,
       triggeredBy: 'manual',
       triggerEvent: 'api',
     }).catch((error) => {

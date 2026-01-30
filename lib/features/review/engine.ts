@@ -16,11 +16,11 @@ const logger = createLogger('review-engine');
 export interface ReviewOptions {
   projectId: number | string;
   mrIid: number;
+  reviewId: number;
   skipPatterns?: string[];
   triggeredBy?: 'webhook' | 'manual' | 'command';
   triggerEvent?: string;
   webhookEventId?: number;
-  reviewId?: number; // 可选：用于重试现有审查记录
 }
 
 export interface ReviewResult {
@@ -43,49 +43,15 @@ export class ReviewEngine {
   }
 
   async reviewMergeRequest(options: ReviewOptions): Promise<ReviewResult> {
-    const { projectId, mrIid, triggeredBy = 'webhook', triggerEvent, webhookEventId, reviewId: existingReviewId } = options;
+    const { projectId, mrIid, reviewId } = options;
     const errors: string[] = [];
 
-    logger.info({ projectId, mrIid, existingReviewId }, 'Starting merge request review');
+    logger.info({ projectId, mrIid, reviewId }, 'Starting merge request review');
 
     const mrChanges = await this.gitlabClient.getMergeRequestChanges(projectId, mrIid);
     const commitSha = mrChanges.diffRefs.headSha;
 
     const db = await getDb();
-
-    // 获取或创建 review 记录
-    let reviewId: number;
-    if (existingReviewId) {
-      // 重试模式：使用现有记录
-      reviewId = existingReviewId;
-      logger.info({ reviewId }, 'Reusing existing review record for retry');
-    } else {
-      // 新建模式：创建新记录
-      const reviewRecord = await db.insert(reviews).values({
-        projectId: projectId.toString(),
-        projectPath: mrChanges.webUrl.split('/').slice(3, 5).join('/'),
-        mrIid,
-        mrTitle: mrChanges.title,
-        mrAuthor: mrChanges.author.username,
-        mrDescription: mrChanges.description || null,
-        sourceBranch: mrChanges.sourceBranch,
-        targetBranch: mrChanges.targetBranch,
-        status: 'running',
-        triggeredBy,
-        triggerEvent,
-        webhookEventId,
-        startedAt: new Date(),
-        retryCount: 0,
-      }).returning();
-
-      const insertedReview = reviewRecord[0];
-
-      if (!insertedReview) {
-        throw new Error('Failed to create review record');
-      }
-
-      reviewId = insertedReview.id;
-    }
 
     const { summaryNoteId } = await this.cleanupOldComments(projectId, mrIid);
 

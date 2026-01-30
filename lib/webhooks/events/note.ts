@@ -1,5 +1,5 @@
 import type { WebhookEventsConfig } from '@/lib/features/config';
-import { getQueueManager } from '@/lib/features/queue';
+import { getDb, reviews } from '@/lib/db';
 import { createLogger } from '@/lib/utils/logger';
 import type { NoteWebhook } from '../types';
 
@@ -78,28 +78,35 @@ export async function handleNoteEvent(
     'Review command detected, triggering review',
   );
 
-  // Enqueue review task
   try {
-    const queueManager = await getQueueManager();
-    await queueManager.enqueue({
-      projectId: project.id,
-      mrIid: mr.iid,
+    const db = await getDb();
+    const [review] = await db.insert(reviews).values({
+      projectId: String(project.id),
       projectPath: project.path_with_namespace,
+      mrIid: mr.iid,
       mrTitle: mr.title,
       mrAuthor: webhook.user.username,
-      mrDescription: mr.description || undefined,
+      mrDescription: mr.description || null,
       sourceBranch: mr.source_branch,
       targetBranch: mr.target_branch,
+      status: 'pending',
       triggeredBy: 'command',
       triggerEvent: command,
-      webhookEventId: options.webhookEventId,
-      priority: 2, // Higher priority for command triggers (1=highest, 10=lowest)
-    });
+      webhookEventId: options.webhookEventId || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
+
+    if (!review) {
+      throw new Error('Failed to create review record');
+    }
+
+    logger.info({ reviewId: review.id, projectId: project.id, mrIid: mr.iid }, 'Review record created');
 
     return { handled: true, skipped: false };
   } catch (error) {
-    logger.error({ error, projectId: project.id, mrIid: mr.iid }, 'Failed to enqueue review task');
+    logger.error({ error, projectId: project.id, mrIid: mr.iid }, 'Failed to create review record');
 
-    return { handled: false, skipped: true, skipReason: 'Failed to enqueue task' };
+    return { handled: false, skipped: true, skipReason: 'Failed to create review record' };
   }
 }

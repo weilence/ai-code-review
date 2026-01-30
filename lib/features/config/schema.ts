@@ -97,27 +97,9 @@ export const DBConfigSchema = z.object({
   }).default({ level: 'info' }),
 
   queue: z.object({
-    enabled: z.boolean().default(true),
     pollingIntervalMs: z.coerce.number().positive().default(5000),
-    maxConcurrentTasks: z.coerce.number().positive().default(3),
-    taskTimeoutMs: z.coerce.number().positive().default(300000),
-    maxRetries: z.coerce.number().positive().default(3),
-    retryBackoffMs: z.coerce.number().positive().default(60000),
-    retryBackoffMultiplier: z.coerce.number().positive().default(2.0),
-    maxRetryBackoffMs: z.coerce.number().positive().default(600000),
-    cleanupIntervalMs: z.coerce.number().positive().default(3600000),
-    retainCompletedDays: z.coerce.number().positive().default(7),
   }).default({
-    enabled: true,
     pollingIntervalMs: 5000,
-    maxConcurrentTasks: 3,
-    taskTimeoutMs: 300000,
-    maxRetries: 3,
-    retryBackoffMs: 60000,
-    retryBackoffMultiplier: 2.0,
-    maxRetryBackoffMs: 600000,
-    cleanupIntervalMs: 3600000,
-    retainCompletedDays: 7,
   }),
 
   copilot: z.object({

@@ -7,7 +7,7 @@ import { createLogger } from '@/lib/utils/logger';
 const logger = createLogger('review-actions');
 
 export async function getReviews(options?: {
-  status?: 'pending' | 'running' | 'completed' | 'failed';
+  status?: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
   limit?: number;
   offset?: number;
 }) {
@@ -164,36 +164,40 @@ export async function triggerManualReview(projectId: number, mrIid: number) {
   try {
     logger.info({ projectId, mrIid }, 'Triggering manual review');
 
-    const { getQueueManager } = await import('@/lib/features/queue/singleton');
     const { GitLabClient } = await import('@/lib/features/gitlab/client');
     const { getDBConfig } = await import('@/lib/features/config');
+    const db = await getDb();
 
-    const queueManager = await getQueueManager();
     const config = await getDBConfig();
-
     const gitlabClient = new GitLabClient(config.gitlab);
     const mrChanges = await gitlabClient.getMergeRequestChanges(
       projectId,
       mrIid
     );
 
-    const taskId = await queueManager.enqueue({
-      projectId,
-      mrIid,
+    const [review] = await db.insert(reviews).values({
+      projectId: String(projectId),
       projectPath: mrChanges.webUrl.split('/').slice(3, 5).join('/'),
+      mrIid,
       mrTitle: mrChanges.title,
       mrAuthor: mrChanges.author.username,
-      mrDescription: mrChanges.description || undefined,
+      mrDescription: mrChanges.description || null,
       sourceBranch: mrChanges.sourceBranch,
       targetBranch: mrChanges.targetBranch,
+      status: 'pending',
       triggeredBy: 'manual',
-      priority: 3,
-    });
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
+
+    if (!review) {
+      throw new Error('Failed to create review record');
+    }
 
     return {
       success: true,
-      data: { taskId },
-      message: '审查任务已加入队列',
+      data: { reviewId: review.id },
+      message: '审查任务已创建',
     };
   } catch (error) {
     logger.error({ error, projectId, mrIid }, 'Failed to trigger manual review');
@@ -228,27 +232,17 @@ export async function retryReview(reviewId: number) {
 
     logger.info({ reviewId }, 'Retrying failed review');
 
-    const { getQueueManager } = await import('@/lib/features/queue/singleton');
-    const queueManager = await getQueueManager();
-
-    const taskId = await queueManager.enqueue({
-      projectId: Number(reviewData.projectId),
-      mrIid: reviewData.mrIid,
-      projectPath: reviewData.projectPath,
-      mrTitle: reviewData.mrTitle,
-      mrAuthor: reviewData.mrAuthor,
-      mrDescription: reviewData.mrDescription || undefined,
-      sourceBranch: reviewData.sourceBranch,
-      targetBranch: reviewData.targetBranch,
-      triggeredBy: 'manual',
-      priority: 1,
-      reviewId, // 关联原有 review 记录
-    });
+    await db.update(reviews)
+      .set({
+        status: 'pending',
+        retryCount: reviewData.retryCount + 1,
+        updatedAt: new Date(),
+      })
+      .where(eq(reviews.id, reviewId));
 
     return {
       success: true,
-      data: { taskId },
-      message: '审查重试任务已加入队列',
+      message: '审查重试任务已创建',
     };
   } catch (error) {
     logger.error({ error, reviewId }, 'Failed to start review retry');
