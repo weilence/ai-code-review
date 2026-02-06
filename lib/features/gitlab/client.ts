@@ -124,6 +124,16 @@ export class GitLabClient {
     await this.api.MergeRequestDiscussions.removeNote(projectId, mrIid, discussionId, noteId);
   }
 
+  async deleteNote(
+    projectId: number | string,
+    mrIid: number,
+    noteId: number,
+  ): Promise<void> {
+    logger.debug({ projectId, mrIid, noteId }, 'Deleting note');
+
+    await this.api.MergeRequestNotes.remove(projectId, mrIid, noteId);
+  }
+
   async getNotes(
     projectId: number | string,
     mrIid: number,
@@ -159,7 +169,7 @@ export class GitLabClient {
     logger.debug({ projectId, sha, state, name: options?.name }, 'Setting commit status');
 
     await this.api.Commits.editStatus(projectId, sha, state, {
-      name: options?.name ?? 'ai-code-review',
+      name: options?.name ?? 'code-review',
       description: options?.description,
       targetUrl: options?.targetUrl,
     });

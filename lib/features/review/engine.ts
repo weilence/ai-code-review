@@ -5,7 +5,7 @@ import type { ReviewConfig } from '@/lib/features/config';
 import { getDb, reviews, reviewLogs } from '@/lib/db';
 import { createLogger } from '@/lib/utils/logger';
 import { CodeReviewAnalyzer, type AnalysisResult } from './analyzer';
-import { formatSummaryComment, formatInlineComment, formatPendingComment, formatErrorComment, type ReviewContext, AI_COMMENT_MARKER } from './prompts';
+import { formatSummaryComment, formatInlineComment, type ReviewContext, AI_COMMENT_MARKER } from './prompts';
 import type { InlineComment, Summary, Severity } from './schema';
 import { filterReviewableFiles, ParsedChunk, ParsedFile } from '../gitlab/review-files';
 import { GitLabClient } from '../gitlab/client';
@@ -53,25 +53,7 @@ export class ReviewEngine {
 
     const db = await getDb();
 
-    const { summaryNoteId } = await this.cleanupOldComments(projectId, mrIid);
-
-    let statusNoteId: number | null = summaryNoteId;
-
-    try {
-      await this.gitlabClient.setCommitStatus(projectId, commitSha, 'running', {
-        description: 'AI code review in progress',
-      });
-
-      if (!statusNoteId) {
-        const note = await this.gitlabClient.postNote(projectId, mrIid, formatPendingComment());
-
-        statusNoteId = note.id;
-      } else {
-        await this.gitlabClient.updateNote(projectId, mrIid, statusNoteId, formatPendingComment());
-      }
-    } catch (error) {
-      logger.warn({ error }, 'Failed to set initial status');
-    }
+    await this.cleanupOldComments(projectId, mrIid);
 
     const parsedFiles = this.parseChanges(mrChanges);
     const reviewableFiles = filterReviewableFiles(parsedFiles, this.reviewConfig);
@@ -86,7 +68,7 @@ export class ReviewEngine {
         issuesCount: { critical: 0, major: 0, minor: 0, suggestion: 0 },
       };
 
-      await this.setFinalStatus(projectId, mrIid, commitSha, statusNoteId, 'success', reviewSummary);
+      await this.setFinalStatus(projectId, mrIid, commitSha, 'success', reviewSummary);
 
       return {
         analysis: {
@@ -145,7 +127,7 @@ export class ReviewEngine {
         })
         .where(eq(reviews.id, reviewId));
 
-      await this.setFailedStatus(projectId, commitSha, statusNoteId, mrIid, errorMessage);
+
 
       throw error;
     }
@@ -197,7 +179,7 @@ export class ReviewEngine {
 
     const gitLabState = state === 'failed' ? 'failed' : 'success';
 
-    await this.setFinalStatus(projectId, mrIid, commitSha, statusNoteId, gitLabState, analysis.review.summary);
+    await this.setFinalStatus(projectId, mrIid, commitSha, gitLabState, analysis.review.summary);
 
     logger.info(
       {
@@ -223,7 +205,6 @@ export class ReviewEngine {
     projectId: number | string,
     mrIid: number,
     commitSha: string,
-    noteId: number | null,
     state: 'success' | 'failed',
     summary: Summary,
   ): Promise<void> {
@@ -247,46 +228,12 @@ export class ReviewEngine {
     if (this.reviewConfig.summaryComment) {
       try {
         const summaryBody = formatSummaryComment(summary);
-
-        if (noteId) {
-          await this.gitlabClient.updateNote(projectId, mrIid, noteId, summaryBody);
-        } else {
-          await this.gitlabClient.postNote(projectId, mrIid, summaryBody);
-        }
+        await this.gitlabClient.postNote(projectId, mrIid, summaryBody);
       } catch (error) {
-        logger.warn({ error }, 'Failed to update summary comment');
+        logger.warn({ error }, 'Failed to post summary comment');
       }
     }
   }
-
-  private async setFailedStatus(
-    projectId: number | string,
-    commitSha: string,
-    noteId: number | null,
-    mrIid: number,
-    errorMessage: string,
-  ): Promise<void> {
-    const description = `Review failed: ${errorMessage.substring(0, 240)}`;
-
-    try {
-      await this.gitlabClient.setCommitStatus(projectId, commitSha, 'failed', { description });
-    } catch (error) {
-      logger.warn({ error }, 'Failed to set commit status');
-    }
-
-    try {
-      const errorBody = formatErrorComment(errorMessage);
-
-      if (noteId) {
-        await this.gitlabClient.updateNote(projectId, mrIid, noteId, errorBody);
-      } else {
-        await this.gitlabClient.postNote(projectId, mrIid, errorBody);
-      }
-    } catch (error) {
-      logger.warn({ error }, 'Failed to post error comment');
-    }
-  }
-
   private parseChanges(mrChanges: MergeRequestChanges): ParsedFile[] {
     return mrChanges.changes
       .filter(change => change.diff)
@@ -378,9 +325,9 @@ export class ReviewEngine {
   private async cleanupOldComments(
     projectId: number | string,
     mrIid: number,
-  ): Promise<{ inlineDeleted: number; summaryNoteId: number | null }> {
+  ): Promise<void> {
     let inlineDeleted = 0;
-    let summaryNoteId: number | null = null;
+    let summaryDeleted = 0;
 
     const discussions = await this.gitlabClient.getDiscussions(projectId, mrIid);
 
@@ -393,7 +340,12 @@ export class ReviewEngine {
       }
 
       if (discussion.individual_note) {
-        summaryNoteId = firstNote.id;
+        try {
+          await this.gitlabClient.deleteNote(projectId, mrIid, firstNote.id);
+          summaryDeleted++;
+        } catch (error) {
+          logger.warn({ error, noteId: firstNote.id }, 'Failed to delete summary note');
+        }
       } else {
         for (const note of discussion.notes) {
           if (note.body.includes(AI_COMMENT_MARKER)) {
@@ -408,9 +360,7 @@ export class ReviewEngine {
       }
     }
 
-    logger.info({ projectId, mrIid, inlineDeleted, hasSummary: summaryNoteId !== null }, 'Cleaned up old AI comments');
-
-    return { inlineDeleted, summaryNoteId };
+    logger.info({ projectId, mrIid, inlineDeleted, summaryDeleted }, 'Cleaned up old AI comments');
   }
 
   private hasIssuesAboveThreshold(summary: Summary): boolean {
